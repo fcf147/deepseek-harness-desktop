@@ -103,6 +103,19 @@ let mainWindow = null
 let serverChild = null
 let tray = null
 let quitting = false
+let webUrl = null
+
+/** 显示主窗口：已存在则聚焦；窗口被关闭（mainWindow=null）则按保存的 URL 重建。 */
+function showMainWindow() {
+  if (!webUrl) return
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.show()
+    mainWindow.focus()
+    return
+  }
+  createWindow(webUrl)
+}
 
 function createWindow(url) {
   mainWindow = new BrowserWindow({
@@ -146,11 +159,11 @@ function createTray() {
   tray = new Tray(image.resize({ width: 16, height: 16 }))
   tray.setToolTip('DeepSeek Harness')
   tray.setContextMenu(Menu.buildFromTemplate([
-    { label: '打开 DeepSeek Harness', click: () => { if (mainWindow) mainWindow.show() } },
+    { label: '打开 DeepSeek Harness', click: () => showMainWindow() },
     { type: 'separator' },
     { label: '退出', click: () => { app.quit() } },
   ]))
-  tray.on('click', () => { if (mainWindow) mainWindow.show() })
+  tray.on('click', () => showMainWindow())
 }
 
 /** 首启动：把随包 profile 模板复制到用户数据目录（web profile 骨架）。 */
@@ -205,6 +218,7 @@ async function shutdown() {
 app.whenReady().then(async () => {
   try {
     const url = await startServer()
+    webUrl = url
     createWindow(url)
     createTray()
   } catch (error) {
