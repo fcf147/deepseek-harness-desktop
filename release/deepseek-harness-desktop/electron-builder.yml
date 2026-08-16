@@ -1,0 +1,68 @@
+# dsh-desktop electron-builder 配置
+# Windows: NSIS 安装包；Linux: rpm（红帽系）
+# 环境变量 ELECTRON_MIRROR 可指向 Electron 二进制镜像（如 https://npmmirror.com/mirrors/electron/）
+#
+# 拆分发布（exe < 100MB）：
+#   - 安装包只内嵌 Electron + 应用代码 + profile 模板 + 7za 解压工具（< 100MB）；
+#   - 体积大头 node（~94MB）与 dsh 运行时（~266MB）由构建脚本压缩成单独的
+#     dsh-runtime.7z（~57MB），与安装包放在同一目录；
+#   - 安装时 NSIS customInstall（installer.nsh）用内置 7za 把归档解压到
+#     $INSTDIR\resources\runtime\，main.js 路径约定不变。
+appId: com.dsh.desktop
+productName: DeepSeek Harness
+copyright: MIT
+
+directories:
+  output: dist
+  buildResources: build
+
+files:
+  - main.js
+  - assets/icon.png
+  - package.json
+
+# Windows（拆分发布）：运行时只带 profile 模板 + 7za 工具；node 与 dsh 在
+# dsh-runtime.7z 归档里，由安装器（installer.nsh）解压到 resources/runtime。
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: assets/icon.png
+  artifactName: "${productName}-${version}-win-${arch}.${ext}"
+  extraResources:
+    - from: runtime/templates
+      to: runtime/templates
+    - from: tools
+      to: tools
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: DeepSeek Harness
+  artifactName: "${productName}-${version}-win-setup.${ext}"
+  # 自定义安装逻辑：解压 dsh-runtime.7z 到 resources/runtime
+  include: installer.nsh
+
+linux:
+  target:
+    - target: rpm
+      arch:
+        - x64
+  icon: assets/icon.png
+  category: Development
+  maintainer: dsh-desktop <dev@dsh.local>
+  vendor: dsh-desktop
+  synopsis: DeepSeek Harness desktop shell
+  description: DeepSeek Harness desktop shell with bundled Node.js runtime and SSH remote development enabled by default.
+  executableName: dsh-desktop
+  # Linux rpm：无 NSIS 安装钩子，保持全量运行时随包分发。
+  extraResources:
+    - from: runtime
+      to: runtime
+      filter:
+        - "**/*"
+
+npmRebuild: false

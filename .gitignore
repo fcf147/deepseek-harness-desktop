@@ -1,0 +1,42 @@
+# ── 构建缓存 / 依赖（不入库）──────────────────────────────
+node_modules/
+.pnpm-store/
+**/node_modules/
+
+# ── 工具链缓存（本机构建机专用）───────────────────────────
+.tools/
+
+# ── 运行时组装产物（可由 prepare-runtime.mjs 重建）────────
+desktop/runtime/
+desktop/dist/
+desktop/build/
+desktop/tools/7za.exe
+
+# ── 发布包二进制（已上传 Gitee Release，仓库内不存）────────
+release/publish-*/
+*.exe
+*.7z
+*.zip
+*.rpm
+
+# ── 前端/编译产物（官方仓库 build 时生成）─────────────────
+apps/web/dist/
+apps/web/.vite/
+**/tsconfig.*.tsbuildinfo
+
+# ── 会话/日志/临时文件 ───────────────────────────────────
+.smoke-*/
+.smoke-*
+*.log
+session.jsonl
+deepseek-harness.json
+.ctx-extract.txt
+*.tmp
+.DS_Store
+Thumbs.db
+
+# ── release 历史备份（git-archive 下）────────────────────
+.git-archive/
+
+# ── 官方仓库 zip 原始包 ─────────────────────────────────
+deepseek-harness-master.zip

@@ -1,0 +1,8 @@
+{
+  "modelVersion": "5.0.0",
+  "description": "DeepSeek Harness 鸿蒙客户端壳",
+  "dependencies": {},
+  "devDependencies": {
+    "@ohos/hypium": "1.0.19"
+  }
+}
