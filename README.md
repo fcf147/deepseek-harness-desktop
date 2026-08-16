@@ -37,10 +37,16 @@ DeepSeek Harness 的桌面发行版：Electron 壳 + 内置免安装 Node.js 运
 
 ## 快速开始（使用安装包）
 
-1. 下载并安装 `DeepSeek Harness-<version>-win-setup.exe`（Windows）。
-2. 启动应用，首次运行会初始化用户数据目录（Windows：`%APPDATA%\dsh-desktop\home`，Linux：`~/.config/dsh-desktop/home`）并启动 `dsh web` 服务；桌面版使用独立数据目录，不与已有 CLI 的 `~/.dsh` 互相干扰。
-3. 在工作区选择器中选择本地或远程工作区（远程需先在「设置 → 远程工作台」添加机器）。
-4. 如需在 HarmonyOS 设备上使用，安装 `harmony/` 客户端并填入桌面端显示的 `dsh web:` 地址。
+Windows 为**拆分发布**，需要同时下载两个文件并放在同一目录：
+
+1. 下载 `DeepSeek Harness-<version>-win-setup.exe`（< 100MB，只含 Electron 壳 + 应用代码 + profile 模板）。
+2. 下载 `dsh-runtime.7z`（内置 Node + dsh 运行时归档，~57MB），与安装包放在同一目录。
+3. 运行安装包：安装程序会用内置 7za 把归档解压到安装目录的 `resources\runtime\`；归档缺失时会中止并提示。
+4. 启动应用，首次运行会初始化用户数据目录（Windows：`%APPDATA%\dsh-desktop\home`，Linux：`~/.config/dsh-desktop/home`）并启动 `dsh web` 服务；桌面版使用独立数据目录，不与已有 CLI 的 `~/.dsh` 互相干扰。
+5. 在工作区选择器中选择本地或远程工作区（远程需先在「设置 → 远程工作台」添加机器）。
+6. 如需在 HarmonyOS 设备上使用，安装 `harmony/` 客户端并填入桌面端显示的 `dsh web:` 地址。
+
+> 升级应用版本时只需重新安装新的 exe，`dsh-runtime.7z` 通用（除非 Node/dsh 运行时本身升级）。
 
 ## 从源码构建
 
@@ -75,8 +81,12 @@ npm run build:win
 
 产物位于 `dist/`：
 
-- Windows：`dist/DeepSeek Harness-<version>-win-setup.exe`
-- Linux：`dist/DeepSeek Harness-<version>-linux-x64.rpm`
+- Windows：`dist/DeepSeek Harness-<version>-win-setup.exe`（< 100MB）+ `dist/dsh-runtime.7z`（运行时归档，两者同目录发布）
+- Linux：`dist/DeepSeek Harness-<version>-linux-x64.rpm`（rpm 为全量打包，无拆分）
+
+### 拆分发布说明（Windows）
+
+`build.mjs` 在 electron-builder 打包后，用 7za（`desktop/node_modules/7zip-bin`）把 `runtime/node` + `runtime/dsh` 压缩为 `dist/dsh-runtime.7z`；`electron-builder.yml` 的 win `extraResources` 只带 `runtime/templates` 与 `tools/7za.exe`。安装时由 `installer.nsh` 的 `customInstall` 宏把归档解压到 `$INSTDIR\resources\runtime\`，main.js 的路径约定不变。
 
 ### 网络镜像（可选）
 
