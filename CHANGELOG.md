@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.1] - 2026-08-16
+
+修复版。
+
+### Fixed
+
+- 修复托盘无法重新打开主窗口：窗口关闭后 `mainWindow` 置空，托盘「打开」/单击图标改为 `showMainWindow()`——窗口已存在则聚焦，已被关闭则按保存的 `webUrl` 重建窗口（dsh web 服务驻留后台不受影响）。
+
 ## [0.1.0] - 2026-08-16
 
 首次开源发布。
@@ -23,7 +31,3 @@
 - deploy 放行子依赖中的 git 包（`--config.blockExoticSubdeps=false`），支持 `dsh-memory-evolve` 的 git 安装。
 - 还原仓库 `link:` override 的 vendored 包（`@deepseek-ai/cosmokit`、`@deepseek-ai/schemastery`）。
 - **Windows 拆分发布**：安装包控制在 100MB 以内（实测 ~78MB）。体积大头（内置 Node ~94MB + dsh 运行时 ~266MB）压缩为独立归档 `dsh-runtime.7z`（~57MB），与安装包同目录发布；安装时由 `installer.nsh` 的 `customInstall` 用内置 7za 解压到 `resources\runtime\`。新增 `tools/7za.exe` 随包分发，`build.mjs` 增加归档生成步骤，win 与 linux 的 `extraResources` 按平台区分。
-
-### Fixed
-
-- 修复托盘无法重新打开主窗口：窗口关闭后 `mainWindow` 置空，托盘「打开」/单击图标改为 `showMainWindow()`——窗口已存在则聚焦，已被关闭则按保存的 `webUrl` 重建窗口（dsh web 服务驻留后台不受影响）。
