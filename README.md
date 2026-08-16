@@ -1,20 +1,21 @@
 # DeepSeek Harness 桌面版
 
-DeepSeek Harness 的桌面发行版：Electron 壳 + 内置免安装 Node.js 运行时 + 预组装 `dsh` 安装根，**用户无需自行安装 Node.js**。开箱即用并**默认启用 SSH 远程开发（dsh-remote）**，配套 HarmonyOS ArkWeb 客户端。
+DeepSeek Harness 的桌面发行版：Electron 壳 + 内置免安装 Node.js 运行时 + 预组装 `dsh` 安装根，**用户无需自行安装 Node.js**。开箱即用并**默认启用 5 个第三方插件**（SSH 远程开发 dsh-remote、插件市场 dshmarket、消息编辑 dsh-message-edit、视觉工具 @dsh-external/dsh-vision-toolkit、跨会话记忆 dsh-memory-evolve），配套 HarmonyOS ArkWeb 客户端。
 
 - 上游：DeepSeek Harness（`@deepseek-ai/dsh-root`，MIT）
 - 桌面壳：Electron 33 + electron-builder（Windows NSIS / Linux rpm）
 - 内置运行时：Node.js v22 LTS（免安装）+ `dsh` 生产依赖闭包（hoisted 布局）
-- 默认 profile：`web`（dsh-base + dsh-web-app），已注入 dsh-remote 插件
+- 默认 profile：`web`（dsh-base + dsh-web-app），已注入 5 个第三方插件
 
 ## 特性
 
 - **免装 Node.js**：安装包内置 `runtime/node/<platform>-<arch>` 与 `runtime/dsh` 完整闭包，双击即用。
-- **SSH 远程开发默认启用**：web profile 挂载第三方 `dsh-remote` 插件，提供
-  - 设置里的「远程工作台」多机 SSH 注册
-  - 工作区选择器中的远程标签页
-  - 面向模型的 `rw_*` 工具（`rw_connect`、`rw_exec`、`rw_read_file`、`rw_write_file`、`rw_sync` …）
-  - 启动时 `host` 为空（未连接），在界面中配置机器后即可连接。
+- **默认启用 5 个第三方插件**（web profile 挂载）：
+  - `dsh-remote`：SSH 远程开发。设置里的「远程工作台」多机 SSH 注册、工作区选择器中的远程标签页、面向模型的 `rw_*` 工具（`rw_connect`、`rw_exec`、`rw_read_file`、`rw_write_file`、`rw_sync` …）；启动时 `host` 为空，配置机器后即可连接。
+  - `dshmarket`：可视化插件市场（浏览 / 搜索 / 猜你喜欢 / 一键安装 / 已装管理）。
+  - `dsh-message-edit`：分支式消息编辑（reroll / 重试 / 版本时间线）。
+  - `@dsh-external/dsh-vision-toolkit`：图像问答、OCR、定位、界面还原、像素级对比（agent-vision-toolkit）。
+  - `dsh-memory-evolve`：跨会话长期记忆与后台自我进化（五轨记忆、技能、待办）；自 GitHub 安装并钉在提交 `ce7f0faa`。
 - **跨端**：同一 `dsh web:` 服务既可在桌面应用内使用，也可被 `harmony/`（HarmonyOS 客户端）连接。
 
 ## 目录结构
@@ -56,10 +57,10 @@ DeepSeek Harness 的桌面发行版：Electron 壳 + 内置免安装 Node.js 运
 # 1. 获取官方仓库源码（deepseek-harness monorepo，基线版本 @deepseek-ai/dsh-root@0.1.0-rc.5）
 git clone <deepseek-harness-官方仓库> && cd deepseek-harness-master
 
-# 2. 应用本仓库的补丁（dsh-remote 默认启用、peer 范围放宽、ssh2 构建放行等）
+# 2. 应用本仓库的补丁（5 个默认插件、peer 范围放宽、ssh2 构建放行等）
 git apply ../deepseek-harness-desktop/patches/desktop-runtime.patch
 
-# 3. 构建官方仓库（产出 apps/cli/lib/bin.js 等）
+# 3. 构建官方仓库（产出 apps/cli/lib/bin.js 等；dsh-memory-evolve 经 GitHub 安装，需可访问 github.com）
 pnpm install
 pnpm run build
 
@@ -100,8 +101,9 @@ export ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-b
 2. **dsh 安装根**：`pnpm --filter @deepseek-ai/dsh deploy --legacy --prod`，关键参数：
    - `--config.node-linker=hoisted`：扁平化顶层 node_modules。web profile 的模块回退目录（`healProfilesModuleFallback`）按字面路径解析闭包依赖，isolated 布局下嵌套传递依赖不可见。
    - `--config.auto-install-peers=false` / `--config.link-workspace-packages=true`。
+   - `--config.blockExoticSubdeps=false`：放行子依赖中的 git 依赖（`dsh-memory-evolve` 仅发布在 GitHub，钉在固定提交）。
    - 还原 `link:` override 的 vendored 包（`@deepseek-ai/cosmokit`、`schemastery`），legacy deploy 不会自动落盘。
-3. **profile 模板**：写入 `runtime/templates/profiles/web`（web-app bundle 已默认启用 dsh-remote）。
+3. **profile 模板**：写入 `runtime/templates/profiles/web`（web-app bundle 已默认启用 5 个第三方插件）。
 
 ## 对官方仓库的修改
 
@@ -110,15 +112,16 @@ export ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-b
 | 文件 | 改动 |
 | --- | --- |
 | `apps/cli/package.json` | 补充 19 个 `peerDependencies`，使 profile 闭包（heal 回退）可解析到所有依赖 |
-| `packages/bundle/web-app/cordis.patch.yml` | web profile 增加 `dsh-remote` 行（SSH 远程开发，默认启用） |
-| `packages/bundle/web-app/package.json` | 增加 `dsh-remote: ^0.5.4` 依赖 |
-| `pnpm-workspace.yaml` | `peerDependencyRules.allowedVersions` 放宽 dsh-remote 对 rc.6 的 peer 范围；`allowBuilds` 放行 `ssh2`/`cpu-features`（ssh2 的可选加速绑定，构建失败时自动降级） |
+| `packages/bundle/web-app/cordis.patch.yml` | web profile 增加 5 个第三方插件行（dsh-remote、dsh-market、message-edit、vision-toolkit、dsh-memory-evolve，默认启用） |
+| `packages/bundle/web-app/package.json` | 增加 `dsh-remote@^0.5.4`、`dshmarket@^1.9.0`、`dsh-message-edit@^0.2.2`、`@dsh-external/dsh-vision-toolkit@^0.1.4`、`dsh-memory-evolve`（git 依赖，钉 `ce7f0faa`） |
+| `pnpm-workspace.yaml` | `peerDependencyRules.allowedVersions` 放宽 dsh-remote 对 rc.6 的 peer 范围；`allowBuilds` 放行 `ssh2`/`cpu-features`（ssh2 的可选加速绑定，构建失败时自动降级）；`minimumReleaseAgeExclude` 放行刚发布的 `dshmarket@1.9.0` |
 
-> 注：`dsh-remote` 为 npm 上的第三方插件（`dsh-remote@^0.5.4`），不属于官方仓库；启用其所需的最小 peer 范围放宽已写进 workspace 配置。若不想默认启用，删除补丁中 `cordis.patch.yml` 的 `dsh-remote` 行即可。
+> 注：5 个插件均为第三方（npm 或 GitHub，`dsh-memory-evolve` 仅发布在 GitHub 故钉在提交），不属于官方仓库；启用它们所需的最小 peer 范围放宽已写进 workspace 配置。若不想默认启用某插件，删除补丁中 `cordis.patch.yml` 的对应行即可。
 
 ## 常见问题
 
 - **SSH 连接失败？** 确认目标机器已开 SSH，且本机有可用密钥/口令。`ssh2` 的原生加速（cpu-features）在本机无 C 编译器时会自动跳过，不影响功能。
+- **视觉工具需要 Python 吗？** `@dsh-external/dsh-vision-toolkit` 首次使用图像能力时按需获取 agent-vision-toolkit 运行时；不可用时该插件自动降级，不影响其它功能。
 - **能否自己指定 Node 版本？** 构建时 `DSH_DESKTOP_NODE_VERSION` 可覆盖内置版本，但需满足 dsh 的 `engines`（`^22.19.0 || >=24.0.0`）。
 - **rpm 需要什么发行版？** 红帽系（Fedora/RHEL/openEuler 等）。
 

@@ -12,8 +12,9 @@
  *     templates/profiles/web/          web profile 骨架（复制到用户数据目录）
  *
  * dsh 安装根用 pnpm deploy 从官方仓库组装：它会把 @deepseek-ai/dsh 及其
- * 生产依赖（包括我们默认启用的 dsh-remote 与 ssh2）扁平化为一个可独立运行
- * 的 node_modules，无需用户安装全局 Node.js。
+ * 生产依赖（包括我们默认启用的 5 个第三方插件：dsh-remote、dshmarket、
+ * dsh-message-edit、@dsh-external/dsh-vision-toolkit、dsh-memory-evolve，
+ * 以及 ssh2）扁平化为一个可独立运行的 node_modules，无需用户安装全局 Node.js。
  *
  * 前置条件（仅构建机需要）：
  *   - 官方仓库已 `pnpm install && pnpm run build`（构建机需要 Node 22+ 与 pnpm）
@@ -221,6 +222,10 @@ async function deployDsh(args) {
     '--config.node-linker=hoisted',
     '--config.auto-install-peers=false',
     '--config.link-workspace-packages=true',
+    // web-app bundle 默认启用 dsh-memory-evolve，它以 git 依赖钉在固定提交
+    // （仅发布在 GitHub，未上 npm）。deploy 的默认 blockExoticSubdeps 会拒绝
+    // 子依赖中的 git 包，此处显式放行。
+    '--config.blockExoticSubdeps=false',
     dest,
   ]
   // 子 postinstall（cpu-features、dsh-subprocess-local 的 ensure-spawn-helper）
@@ -290,7 +295,7 @@ function writeProfileTemplate() {
   const dir = path.join(RUNTIME_ROOT, 'templates', 'profiles', 'web')
   mkdirSync(dir, { recursive: true })
   // 与官方 PROFILE_TEMPLATES.web 一致：base + web-app（web-app bundle 已默认
-  // 启用 dsh-remote，SSH 远程开发开箱即用）。
+  // 启用 5 个第三方插件，开箱即用）。
   writeFileSync(path.join(dir, 'package.json'), JSON.stringify({
     name: 'dsh-profile-web',
     private: true,
@@ -298,7 +303,7 @@ function writeProfileTemplate() {
     dsh: { profile: { bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app'] } },
   }, null, 2) + '\n')
   writeFileSync(path.join(dir, 'cordis.patch.yml'),
-    '# 此 profile 的用户 patch 层：随包模板为空，dsh-remote 已由 web-app bundle 默认启用。\n[]\n')
+    '# 此 profile 的用户 patch 层：随包模板为空，5 个默认插件已由 web-app bundle 启用。\n[]\n')
   log(`profile 模板就绪: ${dir}`)
 }
 

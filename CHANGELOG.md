@@ -7,12 +7,18 @@
 ### Added
 
 - Electron 桌面壳（Windows NSIS 安装包 / Linux rpm），内置免安装 Node.js v22.19.0 与 `dsh` 生产依赖闭包，用户无需安装 Node.js。
-- Web profile 默认启用 SSH 远程开发（第三方 `dsh-remote` 插件）：远程工作台、远程工作区标签页、模型 `rw_*` 工具。
-- 对官方仓库的补丁集（`patches/desktop-runtime.patch`）：dsh-remote 默认启用、peer 范围放宽、ssh2 构建放行。
+- Web profile 默认启用 5 个第三方插件：
+  - `dsh-remote`：SSH 远程开发（远程工作台、远程工作区标签页、模型 `rw_*` 工具）。
+  - `dshmarket`：可视化插件市场（浏览 / 搜索 / 一键安装 / 已装管理）。
+  - `dsh-message-edit`：分支式消息编辑（reroll / 重试 / 版本时间线）。
+  - `@dsh-external/dsh-vision-toolkit`：图像问答、OCR、定位、界面还原、像素级对比。
+  - `dsh-memory-evolve`：跨会话长期记忆与后台自我进化（自 GitHub 安装，钉在提交 `ce7f0faa`）。
+- 对官方仓库的补丁集（`patches/desktop-runtime.patch`）：5 个插件默认启用、peer 范围放宽、ssh2 构建放行、`minimumReleaseAgeExclude`。
 - HarmonyOS ArkWeb 客户端（`harmony/`），连接桌面端 `dsh web` 服务。
 - 一键构建脚本 `scripts/build.mjs` 与运行时装配脚本 `scripts/prepare-runtime.mjs`（幂等、支持镜像/离线复用）。
 
 ### Changed
 
 - 运行时以 hoisted 布局扁平化（`--config.node-linker=hoisted`），使 profile 模块回退目录可解析完整闭包。
+- deploy 放行子依赖中的 git 包（`--config.blockExoticSubdeps=false`），支持 `dsh-memory-evolve` 的 git 安装。
 - 还原仓库 `link:` override 的 vendored 包（`@deepseek-ai/cosmokit`、`@deepseek-ai/schemastery`）。
