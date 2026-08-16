@@ -105,7 +105,7 @@
     "commander": "^15.0.0",
     "dsh-remote": "^0.5.4",
     "@dsh-external/dsh-vision-toolkit": "^0.1.4",
-    "dsh-memory-evolve": "github:dsh-external/dsh-memory-evolve#ce7f0faa0e0240f117c29795e9224c0d9ed18183",
+    "dsh-memory-evolve": "github:dsh-external/dsh-memory-evolve#main",
     "dsh-message-edit": "^0.2.2",
     "dshmarket": "^1.9.0"
   },
