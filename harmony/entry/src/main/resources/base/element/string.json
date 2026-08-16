@@ -1,0 +1,16 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "DeepSeek Harness 客户端"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "DeepSeek Harness 客户端"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "DeepSeek Harness"
+    }
+  ]
+}
