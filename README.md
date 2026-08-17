@@ -1,6 +1,6 @@
 # DeepSeek Harness — 桌面化定制工程（单仓库）
 
-> **第三方插件声明**：本仓库默认启用的 5 个插件（`dsh-remote`、`dshmarket`、`dsh-message-edit`、`@dsh-external/dsh-vision-toolkit`、`dsh-memory-evolve`）**均为第三方开源插件，非 DeepSeek 官方出品**，官方 [`deepseek-harness`](https://github.com/deepseek-ai/deepseek-harness) 默认并不启用它们。默认挂载是**本仓库的定制行为**（通过补丁落地，见「对官方仓库的修改」）；不需要的插件可删除 `packages/bundle/web-app/cordis.patch.yml` 中对应行后重新构建关闭。
+> **第三方插件声明**：本仓库默认启用的 5 个插件（`dsh-remote`、`dshmarket`、`dsh-message-edit`、`@dsh-external/dsh-vision-toolkit`、`dsh-memory-evolve`）**均为第三方开源插件，非 DeepSeek 官方出品，亦非 DeepSeek 背书**；它们由本仓库维护者自选启用（默认挂载是**本仓库的定制行为**，通过补丁落地，见「对官方仓库的修改」），官方 [`deepseek-harness`](https://github.com/deepseek-ai/deepseek-harness) 默认并不启用它们。不需要的插件可删除 `packages/bundle/web-app/cordis.patch.yml` 中对应行后重新构建关闭。
 
 > **版本基线说明**：本仓库基于官方 [`deepseek-harness`](https://github.com/deepseek-ai/deepseek-harness) 的 **`0.1.0-rc.5` 完整源码快照**（`repo/deepseek-harness-master/`）定制。npm 上最新已发布 `0.1.0-rc.6`，但 **rc.6 为 CLI 聚合包（编译产物），不是完整 monorepo 源码树**，且其与 rc.5 源码树存在差异（provider 适配、cordis patch 兼容层有改动），补丁无法直接迁移。因此本仓库**有意锁定 rc.5 基线**以保证构建可复现；升级路径见「升级官方基线」章节。
 
