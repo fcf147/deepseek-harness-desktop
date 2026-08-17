@@ -1496,8 +1496,8 @@ importers:
         specifier: ^15.0.0
         version: 15.0.0
       dsh-memory-evolve:
-        specifier: github:dsh-external/dsh-memory-evolve#main
-        version: git+https://github.com/dsh-external/dsh-memory-evolve.git#75fbfa109c79f8431631055498a993c586cd8f00
+        specifier: github:dsh-external/dsh-memory-evolve#1aca4c49f23116e05f9ee645265bcdcf7e50d9a0
+        version: git+https://github.com/dsh-external/dsh-memory-evolve.git#1aca4c49f23116e05f9ee645265bcdcf7e50d9a0
       dsh-message-edit:
         specifier: ^0.2.2
         version: 0.2.2
@@ -8721,6 +8721,8 @@ importers:
 
   vendor/cosmokit: {}
 
+  vendor/dsh-memory-evolve: {}
+
   vendor/group:
     dependencies:
       '@deepseek-ai/cordis':
@@ -12169,8 +12171,8 @@ packages:
   dompurify@3.4.11:
     resolution: {integrity: sha512-zhlUV12GsaRzMsf9q5M254YhA4+VuF0fG+QFqu6aYpoGlKtz+w8//jBcGVYBgQkR5GHjUomejY84AV+/uPbWdw==}
 
-  dsh-memory-evolve@git+https://github.com/dsh-external/dsh-memory-evolve.git#75fbfa109c79f8431631055498a993c586cd8f00:
-    resolution: {commit: 75fbfa109c79f8431631055498a993c586cd8f00, repo: https://github.com/dsh-external/dsh-memory-evolve.git, type: git}
+  dsh-memory-evolve@git+https://github.com/dsh-external/dsh-memory-evolve.git#1aca4c49f23116e05f9ee645265bcdcf7e50d9a0:
+    resolution: {commit: 1aca4c49f23116e05f9ee645265bcdcf7e50d9a0, repo: https://github.com/dsh-external/dsh-memory-evolve.git, type: git}
     version: 0.1.0
 
   dsh-message-edit@0.2.2:
@@ -17369,7 +17371,7 @@ snapshots:
     optionalDependencies:
       '@types/trusted-types': 2.0.7
 
-  dsh-memory-evolve@git+https://github.com/dsh-external/dsh-memory-evolve.git#75fbfa109c79f8431631055498a993c586cd8f00: {}
+  dsh-memory-evolve@git+https://github.com/dsh-external/dsh-memory-evolve.git#1aca4c49f23116e05f9ee645265bcdcf7e50d9a0: {}
 
   dsh-message-edit@0.2.2: {}
 

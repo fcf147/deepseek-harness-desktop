@@ -15,7 +15,7 @@ DeepSeek Harness 的桌面发行版：Electron 壳 + 内置免安装 Node.js 运
   - `dshmarket`：可视化插件市场（浏览 / 搜索 / 猜你喜欢 / 一键安装 / 已装管理）。
   - `dsh-message-edit`：分支式消息编辑（reroll / 重试 / 版本时间线）。
   - `@dsh-external/dsh-vision-toolkit`：图像问答、OCR、定位、界面还原、像素级对比（agent-vision-toolkit）。
-  - `dsh-memory-evolve`：跨会话长期记忆与后台自我进化（五轨记忆、技能、待办）；自 GitHub 安装并钉在提交 `ce7f0faa`。
+  - `dsh-memory-evolve`：跨会话长期记忆与后台自我进化（五轨记忆、技能、待办）；自 GitHub 安装并钉在提交 `1aca4c4`。
 - **跨端**：同一 `dsh web:` 服务既可在桌面应用内使用，也可被 `harmony/`（HarmonyOS 客户端）连接。
 
 ## 目录结构
@@ -102,7 +102,7 @@ pnpm install
 pnpm run build
 ```
 
-> `pnpm install` 会经 GitHub 安装 `dsh-memory-evolve`（钉在提交 `ce7f0faa`），需可访问 github.com；
+> `pnpm install` 会经 GitHub 安装 `dsh-memory-evolve`（钉在提交 `1aca4c4`），需可解析该提交（GitHub 不可达时用本地镜像）；
 > `pnpm run build` 产出 `apps/cli/lib/bin.js` 等，供桌面壳 deploy 引用。
 
 ### 4. 安装桌面壳依赖
@@ -174,7 +174,7 @@ export ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-b
 | --- | --- |
 | `apps/cli/package.json` | 补充 19 个 `peerDependencies`，使 profile 闭包（heal 回退）可解析到所有依赖 |
 | `packages/bundle/web-app/cordis.patch.yml` | web profile 增加 5 个第三方插件行（dsh-remote、dsh-market、message-edit、vision-toolkit、dsh-memory-evolve，默认启用） |
-| `packages/bundle/web-app/package.json` | 增加 `dsh-remote@^0.5.4`、`dshmarket@^1.9.0`、`dsh-message-edit@^0.2.2`、`@dsh-external/dsh-vision-toolkit@^0.1.4`、`dsh-memory-evolve`（git 依赖，钉 `ce7f0faa`） |
+| `packages/bundle/web-app/package.json` | 增加 `dsh-remote@^0.5.4`、`dshmarket@^1.9.0`、`dsh-message-edit@^0.2.2`、`@dsh-external/dsh-vision-toolkit@^0.1.4`、`dsh-memory-evolve`（git 依赖，钉 `1aca4c4`） |
 | `pnpm-workspace.yaml` | `peerDependencyRules.allowedVersions` 放宽 dsh-remote 对 rc.6 的 peer 范围；`allowBuilds` 放行 `ssh2`/`cpu-features`（ssh2 的可选加速绑定，构建失败时自动降级）；`minimumReleaseAgeExclude` 放行刚发布的 `dshmarket@1.9.0` |
 
 > 注：5 个插件均为第三方（npm 或 GitHub，`dsh-memory-evolve` 仅发布在 GitHub 故钉在提交），不属于官方仓库；启用它们所需的最小 peer 范围放宽已写进 workspace 配置。若不想默认启用某插件，删除补丁中 `cordis.patch.yml` 的对应行即可。

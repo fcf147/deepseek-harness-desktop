@@ -5,7 +5,7 @@
 ## 应用前提
 
 - 官方仓库基线版本：`@deepseek-ai/dsh-root@0.1.0-rc.5`。
-- `dsh-memory-evolve` 以 git 依赖指向 `#main` 分支，`pnpm install` 默认需要可访问 github.com；GitHub 不可达时的离线方案见仓库根 README「网络受限/离线构建」章节。
+- `dsh-memory-evolve` 以 git 依赖**钉在固定提交 `1aca4c49f23116e05f9ee645265bcdcf7e50d9a0`**，`pnpm install` 需能解析该提交（GitHub 可达时直连，不可达时用本地镜像，见仓库根 README「网络受限/离线构建」章节）。
 
 ## 应用方法
 
@@ -47,7 +47,7 @@ git apply ../deepseek-harness-desktop/patches/desktop-runtime.patch
 - `dsh-market`（npm 包名 `dshmarket`）提供可视化插件市场侧边栏（浏览 / 搜索 / 一键安装 / 已装管理）。
 - `message-edit`（npm 包名 `dsh-message-edit`）提供分支式消息编辑、reroll、重试与版本时间线。
 - `vision-toolkit`（npm 包名 `@dsh-external/dsh-vision-toolkit`）提供图像问答、OCR、定位、界面还原、像素级对比；其 vendored agent-vision-toolkit 运行时按需获取，不可用时自动降级。
-- `dsh-memory-evolve`（仅发布在 GitHub，git 依赖指向 `#main` 分支）提供跨会话长期记忆与后台自我进化。指向 `#main` 而非钉提交，是为了在 GitHub 不可达时可用本地镜像/离线方案解析（见仓库 README「网络受限/离线构建」章节）；若你的环境可访问 GitHub 且追求可复现，可自行改回固定提交 `ce7f0faa0e0240f117c29795e9224c0d9ed18183`。
+- `dsh-memory-evolve`（仅发布在 GitHub）提供跨会话长期记忆与后台自我进化。以 git 依赖**钉在固定提交 `1aca4c49f23116e05f9ee645265bcdcf7e50d9a0`**（而非 `#main`），保证构建可复现；离线镜像预置了该提交，GitHub 不可达时同样可解析（见仓库 README「网络受限/离线构建」章节）。
 
 **如何关闭默认启用**：删除对应行后重新构建。
 
@@ -58,7 +58,7 @@ git apply ../deepseek-harness-desktop/patches/desktop-runtime.patch
 ```json
 "dsh-remote": "^0.5.4",
 "@dsh-external/dsh-vision-toolkit": "^0.1.4",
-"dsh-memory-evolve": "github:dsh-external/dsh-memory-evolve#main",
+"dsh-memory-evolve": "github:dsh-external/dsh-memory-evolve#1aca4c49f23116e05f9ee645265bcdcf7e50d9a0",
 "dsh-message-edit": "^0.2.2",
 "dshmarket": "^1.9.0"
 ```

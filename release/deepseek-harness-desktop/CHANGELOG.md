@@ -20,7 +20,7 @@
   - `dshmarket`：可视化插件市场（浏览 / 搜索 / 一键安装 / 已装管理）。
   - `dsh-message-edit`：分支式消息编辑（reroll / 重试 / 版本时间线）。
   - `@dsh-external/dsh-vision-toolkit`：图像问答、OCR、定位、界面还原、像素级对比。
-  - `dsh-memory-evolve`：跨会话长期记忆与后台自我进化（自 GitHub 安装，钉在提交 `ce7f0faa`）。
+  - `dsh-memory-evolve`：跨会话长期记忆与后台自我进化（自 GitHub 安装，钉在提交 `1aca4c4`）。
 - 对官方仓库的补丁集（`patches/desktop-runtime.patch`）：5 个插件默认启用、peer 范围放宽、ssh2 构建放行、`minimumReleaseAgeExclude`。
 - HarmonyOS ArkWeb 客户端（`harmony/`），连接桌面端 `dsh web` 服务。
 - 一键构建脚本 `scripts/build.mjs` 与运行时装配脚本 `scripts/prepare-runtime.mjs`（幂等、支持镜像/离线复用）。
