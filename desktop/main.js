@@ -185,10 +185,17 @@ function startServer() {
   const node = nodeBin()
   const bin = dshBin()
   const args = [bin, '--profile', 'web', '--port', '0']
+  // 内置 Node 的 bin 目录加入 PATH：prepare-runtime 已把 pnpm 预置在那里
+  // （win32: node.exe 同目录 pnpm.cmd；linux: bin/pnpm）。dshmarket 的 pnpm
+  // 探测（probePnpm）与 `dsh plugin` 命令（spawnSync('pnpm')）都从 PATH 解析，
+  // 不补上则插件市场报 "pnpm not found"（corepack/npm 也不在 PATH，运行期
+  // 安装会失败；构建期预置 + 此处 PATH 即可，全程零运行期写入）。
+  const nodeBinDir = path.dirname(node)
   const env = {
     ...process.env,
     // 桌面版独立的用户数据目录，避免与 CLI 的 ~/.dsh 互相干扰。
     DSH_HOME: dshHome(),
+    PATH: `${nodeBinDir}${path.delimiter}${process.env.PATH || ''}`,
   }
   serverChild = spawn(node, args, { env, stdio: ['ignore', 'pipe', 'pipe'] })
   return waitForWebUrl(serverChild).then((url) => {
