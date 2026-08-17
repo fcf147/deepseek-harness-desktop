@@ -1,9 +1,23 @@
 # DeepSeek Harness — 桌面化定制工程（单仓库）
 
+> **第三方插件声明**：本仓库默认启用的 5 个插件（`dsh-remote`、`dshmarket`、`dsh-message-edit`、`@dsh-external/dsh-vision-toolkit`、`dsh-memory-evolve`）**均为第三方开源插件，非 DeepSeek 官方出品**，官方 [`deepseek-harness`](https://github.com/deepseek-ai/deepseek-harness) 默认并不启用它们。默认挂载是**本仓库的定制行为**（通过补丁落地，见「对官方仓库的修改」）；不需要的插件可删除 `packages/bundle/web-app/cordis.patch.yml` 中对应行后重新构建关闭。
+
 基于官方 [`deepseek-harness`](https://github.com/deepseek-ai/deepseek-harness)（基线 `0.1.0-rc.5`）的定制仓库，包含两项核心工作：
 
-1. **开箱即用 SSH 远程开发**：web profile 默认启用 5 个第三方插件（`dsh-remote`、`dshmarket`、`dsh-message-edit`、`dsh-vision-toolkit`、`dsh-memory-evolve`）。
+1. **开箱即用 SSH 远程开发**：web profile 默认启用 5 个第三方插件（`dsh-remote`、`dshmarket`、`dsh-message-edit`、`@dsh-external/dsh-vision-toolkit`、`dsh-memory-evolve`）。
 2. **桌面化**：`desktop/`（Electron 壳，用户免装 Node.js）+ `harmony/`（鸿蒙 ArkWeb 客户端）。
+
+### 默认插件的来源与为什么默认启用
+
+| 插件 | 来源 | 默认启用的原因 |
+|---|---|---|
+| `dsh-remote` | npm registry | SSH 远程开发（多机注册表、远程工作区、面向模型的 `rw_*` 工具），本仓库「开箱即用远程开发」的核心能力 |
+| `dshmarket` | npm registry | 可视化插件市场（浏览 / 搜索 / 一键安装） |
+| `dsh-message-edit` | npm registry | 分支式消息编辑、reroll、重试与版本时间线 |
+| `@dsh-external/dsh-vision-toolkit` | npm registry（`@dsh-external` scope） | 图像问答、OCR、定位、界面还原、像素级对比 |
+| `dsh-memory-evolve` | **GitHub 外部组织 [`dsh-external`](https://github.com/dsh-external)**（git 依赖 `github:dsh-external/dsh-memory-evolve#main`，**非 DeepSeek 官方**） | 跨会话长期记忆 + 后台自我进化，与 dsh 的上下文机制互补，日常使用价值高 |
+
+> 其中 `dsh-memory-evolve` 仅发布在 GitHub（npm 上为私有包），未走 npm registry，故以 git 依赖声明；其源码快照随本仓库预置在 `repo/vendor/dsh-memory-evolve/` 供离线构建使用，可自行审计。
 
 ## 仓库结构
 
@@ -49,7 +63,7 @@ export ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-b
 
 ## 网络受限 / 离线构建（GitHub 封锁时）
 
-`dsh-memory-evolve`（web profile 默认启用的跨会话记忆插件）**仅发布在 GitHub**，以 git 依赖声明（`github:dsh-external/dsh-memory-evolve#main`）。若构建机无法访问 github.com（常见于部分网络环境），`pnpm install`/`pnpm deploy` 会失败。
+`dsh-memory-evolve`（web profile 默认启用的跨会话记忆插件，**来自 GitHub 外部组织 `dsh-external`，非 DeepSeek 官方**）**仅发布在 GitHub**，以 git 依赖声明（`github:dsh-external/dsh-memory-evolve#main`）。若构建机无法访问 github.com（常见于部分网络环境），`pnpm install`/`pnpm deploy` 会失败。
 
 `scripts/setup.mjs` 内置**离线方案**，自动处理：
 
@@ -84,14 +98,40 @@ npm run build:linux    # Linux rpm（在 Linux 构建机上，全量打包无拆
 
 Windows 为**拆分发布**：安装包只含 Electron 壳 + 模板 + 7za 工具；`dsh-runtime.7z`（内置 Node + dsh 运行时）由安装器解压到 `resources\runtime\`。**发布时两个文件放同一目录**。
 
+### 校验下载完整性（sha256）
+
+发布时随 Release 附带校验文件 `sha256sums.txt`（每个发布文件一行：`<64位哈希>  <文件名>`）。**安装前请先校验，且 exe 与 7z 必须来自同一 Release、哈希一致**——安装器本身不校验归档，损坏或串包的 `dsh-runtime.7z` 会导致安装失败或运行时异常：
+
+```bash
+# Linux / macOS
+sha256sum -c sha256sums.txt
+
+# Windows PowerShell（将输出与 sha256sums.txt 中对应行比对）
+Get-FileHash '.\DeepSeek Harness-<版本>-win-setup.exe' -Algorithm SHA256
+Get-FileHash '.\dsh-runtime.7z' -Algorithm SHA256
+```
+
+哈希不一致请勿安装，并在 Gitee Issues 反馈。
+
 ## 对官方仓库的修改
 
-见 [`release/deepseek-harness-desktop/patches/README.md`](release/deepseek-harness-desktop/patches/README.md) 与 `desktop/README.md` 的说明。核心：5 个插件默认启用、19 个 peer 依赖补充、ssh2 构建放行、`minimumReleaseAgeExclude`。
+全部修改集中在补丁集 [`desktop-runtime.patch`](release/deepseek-harness-desktop/patches/desktop-runtime.patch)（4 个文件），摘要如下：
+
+| 文件 | 改动 | 目的 |
+|---|---|---|
+| `apps/cli/package.json` | 补充 19 个 `@deepseek-ai/*` workspace 依赖 | 桌面版 `pnpm deploy` 只装生产依赖，插件「模块回退目录」需要完整依赖闭包，否则 hoisted 布局下运行时 `Cannot find package` |
+| `packages/bundle/web-app/cordis.patch.yml` | 宿主行新增 5 个第三方插件行 | 「默认启用 5 个插件」的落地位置 |
+| `packages/bundle/web-app/package.json` | 补充 5 个插件依赖（其中 `dsh-memory-evolve` 为 git 依赖 `github:dsh-external/dsh-memory-evolve#main`） | 声明插件依赖 |
+| `pnpm-workspace.yaml` | ① 放宽 dsh-remote 的 6 个 `@deepseek-ai/*` peer 范围（rc.6 → rc.5）；② 放行 `ssh2`/`cpu-features` 构建脚本；③ `minimumReleaseAgeExclude` 放行 `dshmarket@1.9.0` | 让插件在 rc.5 基线下可安装、可构建 |
+
+> **关于 `minimumReleaseAgeExclude`（已知的 pnpm 门禁放宽）**：pnpm 10 默认拒绝安装**发布不足 72 小时**的新包（`minimumReleaseAge`，防供应链投毒的时间窗口）。`dshmarket@1.9.0` 发布尚不足该期限，故在此显式放行；**仅针对这一个包**，其余包仍受门禁保护。该条目随包龄增长自动失效，届时可从配置移除。
+
+逐条「为什么」与可审计细节见 [`release/deepseek-harness-desktop/patches/README.md`](release/deepseek-harness-desktop/patches/README.md) 与 `desktop/README.md`。
 
 ## 说明
 
 - `repo/` 的 `node_modules`、`lib/`（官方 .gitignore 排除）、`apps/web/dist` 等构建产物不入库，由 `pnpm install && pnpm run build` 生成。
-- `release/publish-*/` 发布包二进制（exe/7z）不入库，已上传 Gitee Release。
+- `release/publish-*/` 发布包二进制（exe/7z）不入库，已上传 Gitee Release（附 `sha256sums.txt`，见上文校验说明）。
 - `repo/vendor/dsh-memory-evolve/` 为离线构建预置的源码快照（见「网络受限/离线构建」）。
 - 鸿蒙客户端开发：用 DevEco Studio 5.0+ 打开 `harmony/`。
-- 不做 macOS。
+- 不做 macOS（开发者的产品决策，暂不打算支持；与是否拥有 Mac 无关）。
