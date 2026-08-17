@@ -21,6 +21,27 @@
 
 > 其中 `dsh-memory-evolve` 仅发布在 GitHub（npm 上为私有包），未走 npm registry，故以 git 依赖声明；其源码快照随本仓库预置在 `repo/vendor/dsh-memory-evolve/` 供离线构建使用，可自行审计。
 
+### 插件分层架构
+
+插件按职责分两层挂载，避免"多会话串台"与重复注册：
+
+**1. Host plane（进程级，`packages/bundle/web-app/cordis.patch.yml`）** —— 多会话共享的基础设施：
+
+- `dsh-remote`、`dshmarket`、`dsh-message-edit`、`@dsh-external/dsh-vision-toolkit`（第三方，npm）
+- `dsh-memory-evolve`（第三方，GitHub git 依赖，自带 bundle patch 自动注册）
+- `@deepseek-ai/dsh-mcp-client` × 2（**新增**：官方 MCP client 桥接，预置 filesystem + sqlite 两个安全演示 MCP，工具名 `mcp__filesystem__*` / `mcp__sqlite__*`）
+
+> 官方已默认启用的会话基础设施（无需配置）：`session-persistence-jsonl`（zstd 持久化）、`session-log-export`（会话导出）、`session-query-sqlite`（会话查询）、`plan-mode`（plan 模式）、skill 全家（registry / filesystem / tool）。
+
+**2. Preset 会话层（`apps/cli/config/agent-presets/<id>/agent.cordis.yml`）** —— 每会话私有，按档位组合：
+
+- **summer-craft**（新增，桌面版默认档）：完整编码 agent + 通用代码评审 skill（`dsh-code-review`）+ 文档标准 skill（`dsh-doc-standards`）+ 增强 plan-mode 指导 + memory-evolve/message-edit 会话级配置覆盖
+- **standard**（官方默认档）：官方标准编码 agent
+- **minimal**（官方极简档）：固定提示词 + bash + 文件编辑
+
+桌面版首次启动弹窗选择档位（默认 Summer-Craft），选择写入 `$DSH_HOME/settings.yaml` 的 `agent-presets.default`；CLI 用户可在设置中切换。详见 `desktop/main.js` 的 `ensurePresetChoice()`。
+
+
 ## 仓库结构
 
 ```

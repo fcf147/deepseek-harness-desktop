@@ -180,8 +180,96 @@ function ensureProfile() {
   fs.cpSync(template, profiles, { recursive: true })
 }
 
-function startServer() {
+// ── Agent preset 三档选择（Standard / Summer-Craft / Minimal）────────────────
+
+// 桌面版首启让用户选择 agent preset（会话层组合档位），默认 Summer-Craft。
+// 选择写入 $DSH_HOME/settings.yaml 的 agent-presets.default 命名空间
+// （dsh-agent-presets 插件的用户默认档位；官方默认是 standard，这里允许
+// 用户在安装时/首启时覆盖为 Summer-Craft 或其他档位）。
+const PRESET_CHOICES = [
+  {
+    id: 'summer-craft',
+    label: 'Summer-Craft（推荐）',
+    description: '精装修档：完整编码 agent + 自动代码评审（dsh-code-review）+ 文档标准（dsh-doc-standards）+ 增强 plan-mode + 跨会话记忆。',
+  },
+  {
+    id: 'standard',
+    label: 'Standard',
+    description: '官方标准档：完整编码 agent，官方默认组合，无额外增强。',
+  },
+  {
+    id: 'minimal',
+    label: 'Minimal',
+    description: '极简档：固定提示词 + bash + 文件编辑，无 plan-mode/记忆/评审。',
+  },
+]
+
+/** 用户数据目录下的 preset 选择记录（无则未选过）。 */
+function presetChoicePath() {
+  return path.join(dshHome(), '.desktop-preset-choice')
+}
+
+/**
+ * 首启（或用户未选过 preset）时弹出三档选择框，把结果写入
+ * $DSH_HOME/settings.yaml（agent-presets.default）。用户取消则用默认档
+ * Summer-Craft，不阻塞启动。
+ */
+async function ensurePresetChoice() {
+  const home = dshHome()
+  fs.mkdirSync(home, { recursive: true })
+  const marker = presetChoicePath()
+  if (fs.existsSync(marker)) {
+    return // 已选过
+  }
+  let chosen = 'summer-craft' // 默认档
+  let remember = true // 默认记住；对话框异常时按记住处理
+  try {
+    const { response, checkboxChecked } = await dialog.showMessageBox({
+      type: 'question',
+      title: '选择 Agent 预设',
+      message: '选择会话级 Agent 预设（可在设置中随时更改）',
+      detail: PRESET_CHOICES.map((p, i) => `${i + 1}. ${p.label} — ${p.description}`).join('\n\n'),
+      buttons: PRESET_CHOICES.map((p) => p.label),
+      defaultId: 0, // Summer-Craft
+      cancelId: -1,
+      checkboxLabel: '记住选择，下次不再询问',
+      checkboxChecked: true,
+      noLink: true,
+    })
+    if (response >= 0 && response < PRESET_CHOICES.length) {
+      chosen = PRESET_CHOICES[response].id
+    }
+    // 是否写入"记住"标记：勾选则下次不再询问；未勾选则下次启动再问，
+    // 但本次选择仍然生效（写入 settings.yaml）。
+    remember = checkboxChecked !== false
+    if (!remember) {
+      console.log(`[dsh-desktop] 用户未勾选记住，本次使用 ${chosen}，下次启动将重新询问`)
+    }
+  } catch (error) {
+    console.warn('[dsh-desktop] preset 选择框异常，使用默认档 Summer-Craft:', String(error))
+  }
+  // 写入 settings.yaml（YAML 格式，agent-presets.default 命名空间）
+  const settingsPath = path.join(home, 'settings.yaml')
+  let yaml = ''
+  if (fs.existsSync(settingsPath)) {
+    yaml = fs.readFileSync(settingsPath, 'utf8')
+  }
+  const block = `agent-presets:\n  default: ${chosen}\n`
+  if (/^agent-presets:/m.test(yaml)) {
+    yaml = yaml.replace(/^agent-presets:[\s\S]*?(?=^[a-zA-Z][a-zA-Z0-9_-]*:|$)/m, block)
+  } else {
+    yaml = (yaml.trimEnd() ? yaml.trimEnd() + '\n\n' : '') + block
+  }
+  fs.writeFileSync(settingsPath, yaml, 'utf8')
+  if (remember) {
+    fs.writeFileSync(marker, chosen, 'utf8')
+  }
+  console.log(`[dsh-desktop] Agent preset 已选择: ${chosen} -> ${settingsPath}`)
+}
+
+async function startServer() {
   ensureProfile()
+  await ensurePresetChoice()
   const node = nodeBin()
   const bin = dshBin()
   const args = [bin, '--profile', 'web', '--port', '0']
