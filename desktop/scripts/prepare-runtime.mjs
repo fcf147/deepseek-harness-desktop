@@ -135,7 +135,11 @@ function readSingleChildDir(dir) {
 
 async function provisionNode(args) {
   const destDir = nodeRuntimeDir(args.platform, args.arch)
-  if (existsSync(path.join(destDir, args.platform === 'win32' ? 'node.exe' : 'bin', args.platform === 'win32' ? 'node.exe' : 'node'))) {
+  // 就绪探针：win 布局 node.exe 在根目录；linux 布局 bin/node。
+  const nodeProbe = args.platform === 'win32'
+    ? path.join(destDir, 'node.exe')
+    : path.join(destDir, 'bin', 'node')
+  if (existsSync(nodeProbe)) {
     log(`Node 运行时已存在: ${destDir}`)
     return
   }
