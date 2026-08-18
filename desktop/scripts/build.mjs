@@ -88,6 +88,15 @@ if (args.platform === 'win') {
   console.log(`7za 就位: tools/7za.exe (${sevenZip})`)
 }
 
+// 归档压缩选可执行 7za：tools/7za.exe 是 win 版（随包分发给安装器解压归档），
+// 在 Linux 构建机上不能直接执行（除非经 wine/binfmt）。压缩步骤改按宿主平台
+// 选 7zip-bin 的原生 7za（linux 版与 win 版同版本、产物格式一致），
+// win 构建机仍用 sevenZip（即 win 版）。
+const archiver7z = (args.platform === 'win' && process.platform !== 'win32')
+  ? [path.join(DESKTOP_ROOT, 'node_modules', '7zip-bin', 'linux', 'x64', '7za'),
+     path.join(DESKTOP_ROOT, 'node_modules', '7zip-bin', 'linux', 'ia32', '7za')].find(existsSync) || sevenZip
+  : sevenZip
+
 // 2) electron-builder（直接经 node 调其 CLI，绕开 npx.cmd 在含空格路径下的
 //    %~dp0 解析问题）
 const ebCli = path.join(DESKTOP_ROOT, 'node_modules', 'electron-builder', 'cli.js')
@@ -105,7 +114,7 @@ if (args.platform === 'win') {
   const archive = path.join(DESKTOP_ROOT, 'dist', 'dsh-runtime.7z')
   // 归档内保持 node/、dsh/ 顶层结构，解压到 resources\runtime 后与 main.js
   // 的路径约定一致。
-  run(sevenZip, ['a', '-t7z', '-mx=9', '-mmt=on', '-bso0', '-bsp0', archive, 'node', 'dsh'], {
+  run(archiver7z, ['a', '-t7z', '-mx=9', '-mmt=on', '-bso0', '-bsp0', archive, 'node', 'dsh'], {
     cwd: runtimeRoot,
   })
   const stat = statSync(archive)
