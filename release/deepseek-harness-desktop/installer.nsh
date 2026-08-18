@@ -8,12 +8,71 @@
 ;
 ; 归档缺失时中止安装并给出明确提示（应用无法工作）。
 
-; 覆盖安装 / 升级时，自动结束正在运行的旧版本进程（否则 exe 被占用，
-; electron-builder 的 NSIS 安装器无法覆盖文件，升级会失败）。
-!macro customInit
+; ===== 升级路径：先静默卸载旧版本，再继续安装新版本 =====
+; electron-builder 默认对已安装版本走「覆盖安装」；旧版产物若来自不同构建
+; 环境（如 Windows 上构建的旧包 vs Linux 交叉构建的新包），覆盖会失败
+; （文件占用 / 注册表残留 / 安装目录差异）。实测「先卸载再安装」最可靠，
+; 故在 preInit（.onInit 中、写文件之前）完成：
+;   1) 结束可能正在运行的旧进程；
+;   2) 枚举注册表 Uninstall 键（HKCU + HKLM 64 位视图）按 DisplayName 定位旧版；
+;   3) 找到旧版卸载器则静默运行（/S 静默；_?= 防止卸载器自删、保证 ExecWait
+;      可等待其退出），完成后由安装器全新安装新版本。
+!macro preInit
   DetailPrint "检查并结束正在运行的旧版本进程..."
   nsExec::ExecToLog 'taskkill /F /IM "DeepSeek Harness.exe"'
   Sleep 300
+
+  ; 定位旧版安装目录：HKCU（per-user）→ HKLM（per-machine，64 位视图）→ $INSTDIR 兜底
+  StrCpy $R9 ""
+  StrCpy $R0 0
+  ${Do}
+    EnumRegKey $R1 HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall" $R0
+    ${If} $R1 == ""
+      ${ExitDo}
+    ${EndIf}
+    ReadRegStr $R2 HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\$R1" "DisplayName"
+    ${If} $R2 == "${PRODUCT_NAME}"
+      ReadRegStr $R9 HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\$R1" "InstallLocation"
+      ${ExitDo}
+    ${EndIf}
+    IntOp $R0 $R0 + 1
+  ${Loop}
+
+  ${If} $R9 == ""
+    SetRegView 64
+    StrCpy $R0 0
+    ${Do}
+      EnumRegKey $R1 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall" $R0
+      ${If} $R1 == ""
+        ${ExitDo}
+      ${EndIf}
+      ReadRegStr $R2 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\$R1" "DisplayName"
+      ${If} $R2 == "${PRODUCT_NAME}"
+        ReadRegStr $R9 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\$R1" "InstallLocation"
+        ${ExitDo}
+      ${EndIf}
+      IntOp $R0 $R0 + 1
+    ${Loop}
+  ${EndIf}
+
+  ${If} $R9 == ""
+  ${AndIf} ${FileExists} "$INSTDIR\Uninstall ${PRODUCT_NAME}.exe"
+    StrCpy $R9 "$INSTDIR"
+  ${EndIf}
+
+  ${If} $R9 != ""
+  ${AndIf} ${FileExists} "$R9\Uninstall ${PRODUCT_NAME}.exe"
+    DetailPrint "检测到旧版本（$R9），先静默卸载..."
+    ; 复制卸载器到临时目录再运行：卸载器会清空安装目录（_?= 阻止它删掉自己）
+    StrCpy $R8 "$PLUGINSDIR\old-uninstaller.exe"
+    CopyFiles /SILENT "$R9\Uninstall ${PRODUCT_NAME}.exe" "$R8"
+    ${If} ${FileExists} "$R8"
+      ExecWait '"$R8" /S _?=$R9'
+    ${Else}
+      ExecWait '"$R9\Uninstall ${PRODUCT_NAME}.exe" /S _?=$R9'
+    ${EndIf}
+    DetailPrint "旧版本卸载完成，继续安装新版本。"
+  ${EndIf}
 !macroend
 
 !macro customInstall
