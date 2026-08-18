@@ -37,6 +37,7 @@ import {
   createWriteStream,
   readdirSync,
   statSync,
+  readlinkSync,
 } from 'node:fs'
 import { pipeline } from 'node:stream/promises'
 import { Readable } from 'node:stream'
@@ -306,8 +307,20 @@ async function deployDsh(args) {
     // （仅发布在 GitHub，未上 npm）。deploy 的默认 blockExoticSubdeps 会拒绝
     // 子依赖中的 git 包，此处显式放行。
     '--config.blockExoticSubdeps=false',
-    dest,
   ]
+  // 交叉构建（如 Linux 宿主构建 win32 目标）：平台分包的 optionalDependencies
+  // （koffi 3.x 的 @koromix/koffi-<platform>、sharp 的 @img/sharp-<platform>、
+  // node-addon-require-builtin-<platform> 等）由 repo/pnpm-workspace.yaml 的
+  // supportedArchitectures（os: [current, win32] 等）决定：pnpm 除宿主平台外
+  // 同时安装并平铺 win32-x64 平台二进制；否则 deploy 只装 Linux 版原生模块，
+  // 装到 Windows 上启动必崩（session-persistence-jsonl / fs-local 无条件 import
+  // koffi）。注：node-gyp 现场编译的包（cpu-features、ssh2 的 sshcrypto）仍会
+  // 编出宿主版本，但它们是可选加速，缺失时运行库自动降级（ssh2 走纯 JS），
+  // 可接受。
+  if (args.platform !== process.platform) {
+    log(`交叉构建 ${args.platform}：supportedArchitectures 已同时平铺 Windows 平台原生模块`)
+  }
+  deployArgs.push(dest)
   // 子 postinstall（cpu-features、dsh-subprocess-local 的 ensure-spawn-helper）
   // 会直接调用 `node`，需把它所在目录放进 PATH。
   const env = {
@@ -354,6 +367,96 @@ function restoreVendoredOverrides(dest, repoDir) {
   }
 }
 
+/**
+ * 展开目录树中的所有符号链接为真实内容副本（幂等）。
+ * 背景：pnpm 在 Linux 上生成的 node_modules/.bin/* 是符号链接；Windows 版
+ * 7za 解压包含符号链接条目的 7z 归档会失败（installer.nsh 报「运行时解压
+ * 失败」），且链接目标在 Windows 上通常无效。构建期展开后归档内只有普通
+ * 文件，Windows 解压即可用。
+ */
+function dereferenceLinks(dir) {
+  if (!existsSync(dir)) return 0
+  let count = 0
+  const walk = (cur) => {
+    let entries
+    try { entries = readdirSync(cur, { withFileTypes: true }) } catch { return }
+    for (const entry of entries) {
+      const p = path.join(cur, entry.name)
+      if (entry.isSymbolicLink()) {
+        const target = path.resolve(cur, readlinkSync(p))
+        if (!existsSync(target)) {
+          log(`警告: 悬空符号链接，跳过: ${p} -> ${target}`)
+          continue
+        }
+        rmSync(p, { recursive: true, force: true })
+        if (statSync(target).isDirectory()) cpSync(target, p, { recursive: true })
+        else cpSync(target, p)
+        count++
+      } else if (entry.isDirectory()) {
+        walk(p)
+      }
+    }
+  }
+  walk(dir)
+  if (count > 0) log(`已展开符号链接 ${count} 个（Windows 解压兼容）`)
+  return count
+}
+
+/**
+ * 从 repo 的 pnpm 虚拟 store（node_modules/.pnpm）把目标平台的平台分包
+ * （@koromix/koffi-win32-x64、@img/sharp-<platform>、@img/sharp-libvips-<platform>、
+ * node-addon-require-builtin-<platform> 等）复制进 deploy 产物 node_modules。
+ * 背景：pnpm deploy --legacy 对 optionalDependencies 的平台包选择不完整
+ * （sharp 的全平台 optionalDeps 一个都没装，koffi 只装宿主版），而 repo 的
+ * pnpm install 在 supportedArchitectures（repo/pnpm-workspace.yaml）下已下载
+ * 目标平台二进制（.pnpm 虚拟 store 中）。直接复制保证 dsh-runtime 在目标
+ * 平台（Windows 安装包 / Linux rpm）可加载原生模块，Windows 上尤甚
+ * （session-persistence-jsonl / fs-local 无条件 import koffi）。
+ */
+// 排除的超大「外部 CLI」平台包：memory-evolve 的 COI 调度（claude/codex 等
+// 外部 AI）在运行时从用户 PATH 解析，不需要随包内置；claude.exe 单文件 254MB，
+// 打入归档会让 dsh-runtime.7z 暴涨且压缩/解压极慢。
+const EXCLUDE_PLATFORM_PKGS = [
+  '@anthropic-ai/claude-agent-sdk-win32-x64',
+  '@openai/codex-win32-x64',
+]
+
+function copyPlatformPackages(dest, repoDir, platform) {
+  const store = path.join(repoDir, 'node_modules', '.pnpm')
+  if (!existsSync(store)) return 0
+  const marker = `-${platform}-`
+  let count = 0
+  const copyPkg = (srcDir, pkgName) => {
+    if (EXCLUDE_PLATFORM_PKGS.includes(pkgName)) {
+      log(`跳过外部 CLI 平台包（体积过大）: ${pkgName}`)
+      return
+    }
+    const target = path.join(dest, 'node_modules', ...pkgName.split('/'))
+    if (existsSync(target)) return
+    mkdirSync(path.dirname(target), { recursive: true })
+    cpSync(srcDir, target, { recursive: true })
+    count++
+  }
+  for (const entry of readdirSync(store)) {
+    if (!entry.includes(marker)) continue
+    const nodeModules = path.join(store, entry, 'node_modules')
+    if (!existsSync(nodeModules)) continue
+    for (const top of readdirSync(nodeModules)) {
+      const topPath = path.join(nodeModules, top)
+      if (!statSync(topPath).isDirectory() || top === '.pnpm') continue
+      if (top.startsWith('@')) {
+        for (const name of readdirSync(topPath)) {
+          if (name.includes(marker)) copyPkg(path.join(topPath, name), `${top}/${name}`)
+        }
+      } else if (top.includes(marker)) {
+        copyPkg(topPath, top)
+      }
+    }
+  }
+  if (count > 0) log(`补齐 ${platform} 平台包 ${count} 个（自 repo pnpm store）`)
+  return count
+}
+
 /** dsh CLI 是否已就绪：两种常见 deploy 布局都接受。 */
 function isDshReady(dest) {
   return (
@@ -398,6 +501,12 @@ async function main() {
   await provisionPnpm(args)
   await deployDsh(args)
   restoreVendoredOverrides(path.join(RUNTIME_ROOT, 'dsh'), args.repo)
+  // deploy --legacy 对平台分包（sharp/koffi 的 optionalDeps）选择不完整，
+  // 从 repo pnpm store 补齐目标平台原生模块。
+  copyPlatformPackages(path.join(RUNTIME_ROOT, 'dsh'), args.repo, args.platform)
+  // deploy 产物中的符号链接（node_modules/.bin 等）必须展开为普通文件，
+  // 否则 Windows 安装器解压 dsh-runtime.7z 会失败。
+  dereferenceLinks(path.join(RUNTIME_ROOT, 'dsh'))
   writeProfileTemplate()
   log('runtime 组装完成。')
 }

@@ -84,5 +84,22 @@ minimumReleaseAgeExclude:
   - node-addon-require-builtin@0.1.4
   - dshmarket@1.9.0
 
+# 交叉构建（Linux 构建机出 Windows 安装包）：让 pnpm 除当前平台外，
+# 同时安装 win32-x64 平台二进制。pnpm deploy 走 hoisted 布局时这些平台包会
+# 平铺进 node_modules（@koromix/koffi-win32-x64、@img/sharp-win32-x64、
+# node-addon-require-builtin-win32-x64-msvc 等），随 dsh-runtime.7z 发布到
+# Windows 后即可加载；否则 deploy 只装宿主（Linux）版原生模块，Windows 上
+# 启动必崩（session-persistence-jsonl / fs-local 无条件 import koffi）。
+supportedArchitectures:
+  os:
+    - current
+    - win32
+  cpu:
+    - current
+    - x64
+  libc:
+    - current
+    - msvc
+
 patchedDependencies:
   node-pty@1.1.0: patches/node-pty@1.1.0.patch

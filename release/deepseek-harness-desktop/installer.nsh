@@ -8,6 +8,14 @@
 ;
 ; 归档缺失时中止安装并给出明确提示（应用无法工作）。
 
+; 覆盖安装 / 升级时，自动结束正在运行的旧版本进程（否则 exe 被占用，
+; electron-builder 的 NSIS 安装器无法覆盖文件，升级会失败）。
+!macro customInit
+  DetailPrint "检查并结束正在运行的旧版本进程..."
+  nsExec::ExecToLog 'taskkill /F /IM "DeepSeek Harness.exe"'
+  Sleep 300
+!macroend
+
 !macro customInstall
   ${If} ${FileExists} "$EXEDIR\dsh-runtime.7z"
     DetailPrint "正在解压 dsh 运行时 (dsh-runtime.7z) ..."

@@ -121,6 +121,8 @@ function readJson(file) {
 
 function bumpVersion(file, version) {
   const s = readFileSync(file, 'utf8')
+  // 已是目标版本则幂等跳过（替换结果不变会被误判为字段缺失）
+  if (readJson(file).version === version) return
   const replaced = s.replace(/("version":\s*")[^"]+(")/, `$1${version}$2`)
   if (replaced === s) fail(`未能在 ${path.relative(ROOT, file)} 中找到 version 字段`)
   writeFileSync(file, replaced)
