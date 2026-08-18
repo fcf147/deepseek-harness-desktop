@@ -5,7 +5,7 @@
 | 文件 | 大小 | 说明 |
 | --- | --- | --- |
 | `DeepSeek Harness-0.1.2-win-setup.exe` | ~78 MB | 安装包（< 100MB）：Electron 壳 + 应用代码 + profile 模板 + 7za 解压工具 |
-| `dsh-runtime.7z` | ~61 MB | 运行时归档：内置 Node.js v22.19.0 + dsh 生产依赖闭包（含 5 个默认插件） |
+| `dsh-runtime.7z` | ~75 MB | 运行时归档：内置 Node.js v22.19.0 + dsh 生产依赖闭包（含 5 个默认插件 + Windows 平台原生模块） |
 
 **两个文件必须放在同一目录**，安装程序会在安装时自动用内置 7za 把归档解压到 `resources\runtime\`。安装前请先校验 sha256（见文末），exe 与 7z 必须来自同一 Release。
 
@@ -77,8 +77,8 @@ DeepSeek Harness 的**桌面发行版**：Electron 壳 + 内置免安装 Node.js
 见随包 `sha256sums.txt`：
 
 ```
-b2cc9888d9afa3b909ac4d0619ae824087b0f2b1fcaf93c1101a2b7ab80ae7a6  DeepSeek Harness-0.1.2-win-setup.exe
-9acaa838f1ae217ff3f06fec064081ce6ac8aa54768782a63abe61366be8ae95  dsh-runtime.7z
+177ee3bb73f25b2f78de4b045840299556edd1d66662a77c5b269ba9fbbe8e69  DeepSeek Harness-0.1.2-win-setup.exe
+9b05e5bb3b9d96c968bce2ef98344a658bff14966058a4668fb530815adc8ad0  dsh-runtime.7z
 ```
 
 校验命令：
