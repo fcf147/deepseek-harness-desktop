@@ -81,7 +81,9 @@ node scripts/setup.mjs        # 需要 node ≥ 22 与 pnpm ≥ 10（npm i -g pn
 ```bash
 export NODE_MIRROR=https://npmmirror.com/mirrors/node
 export ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/
-export ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/
+# 注意：electron-builder-binaries 的 npmmirror 前缀必须是 registry.npmmirror.com/-/binary/
+# （https://npmmirror.com/mirrors/electron-builder-binaries/ 已失效，返回 404）
+export ELECTRON_BUILDER_BINARIES_MIRROR=https://registry.npmmirror.com/-/binary/electron-builder-binaries/
 ```
 
 ## 网络受限 / 离线构建（GitHub 封锁时）
@@ -111,15 +113,33 @@ git config --global url.file://$PWD/.tools/git-mirror/dsh-memory-evolve.git.inst
 
 > 说明：`dsh-memory-evolve` 以 git 依赖**钉在固定提交** `1aca4c49f23116e05f9ee645265bcdcf7e50d9a0`（而非 `#main`），保证每次安装/构建拉取完全相同的代码，构建可复现；离线镜像（`.tools/git-mirror/dsh-memory-evolve.git`）预置了该提交及其完整历史，GitHub 不可达时同样可解析。如需升级该插件，更新依赖声明与 `pnpm-lock.yaml` 后同步刷新离线镜像即可。
 
+**electron-builder 的二进制下载同样依赖 GitHub**：打包 Windows 安装包时，electron-builder 会从 `github.com/electron-userland/electron-builder-binaries` 拉取 `nsis`、`nsis-resources`、`winCodeSign` 等工具链。GitHub 不可达时构建会在 NSIS 阶段失败（报 `Get "https://github.com/electron-userland/electron-builder-binaries/releases/download/nsis-..." EOF`），两种解决方式（推荐前者）：
+
+```bash
+# 方式一：镜像环境变量（与上面 setup 章节的变量一起导出）
+export ELECTRON_BUILDER_BINARIES_MIRROR=https://registry.npmmirror.com/-/binary/electron-builder-binaries/
+
+# 方式二：预置缓存（构建机一次性；Linux/macOS 缓存目录 ~/.cache/electron-builder/，
+#         Windows 为 %LOCALAPPDATA%/electron-builder/Cache）：
+#   nsis/nsis-3.0.4.1/            （含 linux/makensis，Linux 构建机用）
+#   nsis-resources/nsis-resources-3.4.1/
+#   winCodeSign/winCodeSign-2.6.0/
+#   electron 本体同理可预置 ~/.cache/electron/electron-v<ver>-<platform>-<arch>.zip
+```
+
 ## 构建发布产物
 
 ```bash
 cd desktop
-npm run build:win      # Windows：dist/*-win-setup.exe（<100MB）+ dist/dsh-runtime.7z（57MB，两者同目录发布）
+npm run build:win      # Windows：dist/*-win-setup.exe（约 82MB）+ dist/dsh-runtime.7z（约 61MB，两者同目录发布）
 npm run build:linux    # Linux rpm（在 Linux 构建机上，全量打包无拆分）
 ```
 
-Windows 为**拆分发布**：安装包只含 Electron 壳 + 模板 + 7za 工具；`dsh-runtime.7z`（内置 Node + dsh 运行时）由安装器解压到 `resources\runtime\`。**发布时两个文件放同一目录**。
+**前置条件**：`repo/deepseek-harness-master/` 必须先构建（`pnpm install && pnpm run build`，产出 `apps/cli/lib/bin.js` 与 web dist）——`prepare-runtime` 的 `pnpm deploy` 依赖它，未构建会直接报「仓库尚未构建」。用 `node scripts/setup.mjs` 一条命令可完成 repo 构建 + desktop 依赖 + runtime 组装，再执行上面的构建命令即可。
+
+**交叉构建**：Linux 构建机上直接跑 `npm run build:win` 即可产出 Windows 安装包（脚本已适配：pnpm 以宿主 npm 包装成 win shim、归档自动选用 Linux 版 7za），**无需 wine**。构建期的详细说明与踩坑见 [`desktop/README.md`](desktop/README.md)。
+
+Windows 为**拆分发布**：安装包只含 Electron 壳 + 模板 + 7za 工具；`dsh-runtime.7z`（内置 Node + dsh 运行时，实际约 61MB）由安装器解压到 `resources\runtime\`。**发布时两个文件放同一目录**。
 
 ### 校验下载完整性（sha256）
 
