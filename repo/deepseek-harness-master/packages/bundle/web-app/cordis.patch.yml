@@ -120,6 +120,12 @@
 
     - id: dsh-memory-evolve
       name: 'dsh-memory-evolve'
+
+    # WSL workspace: add a WSL workspace from the web GUI and run the whole
+    # agent session (bash + file tools) inside the WSL distribution, no
+    # toolchain/sshd install inside WSL required (VS Code Remote-WSL style).
+    - id: dsh-wsl-workspace
+      name: 'dsh-wsl-workspace'
     # MCP (Model Context Protocol) client bridge, enabled by default: connects
     # to external MCP servers and registers their tools on ctx.tools under
     # mcp__<serverName>__<rawName>. One safe demo server is pre-wired:

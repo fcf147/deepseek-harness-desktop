@@ -89,6 +89,9 @@ index b06e63b..0842135 100644
 +    - id: dsh-memory-evolve
 +      name: 'dsh-memory-evolve'
 +
++    - id: dsh-wsl-workspace
++      name: 'dsh-wsl-workspace'
++
      # The API gateway: the transport-agnostic dispatch face every client shape
      # shares. The base layer's agent-default-model service owns the default model.
      - id: api-gateway
@@ -104,6 +107,7 @@ index ca4709a..3682f79 100644
 +    "commander": "^15.0.0",
 +    "dsh-remote": "^0.5.4",
 +    "@dsh-external/dsh-vision-toolkit": "^0.1.4",
++    "dsh-wsl-workspace": "^0.2.3",
 +    "dsh-memory-evolve": "github:dsh-external/dsh-memory-evolve#1aca4c49f23116e05f9ee645265bcdcf7e50d9a0",
 +    "dsh-message-edit": "^0.2.2",
 +    "dshmarket": "^1.9.0"

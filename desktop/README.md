@@ -10,6 +10,7 @@
 
 - **内置 Node.js 运行时与完整 dsh 安装**：安装后直接双击/菜单启动，**用户无需安装 Node.js**（Node 运行时随包附带，位于 `resources/runtime/node/`）。
 - **默认启用 SSH 远程开发**：web profile 的 bundle 层已默认挂载 `dsh-remote` 插件（Settings → 远程工作区 添加机器；工作区选择器含 远程 tab；模型侧提供 `rw_*` 工具）。这是对官方仓库默认配置的修改（见 `repo/deepseek-harness-master` 中 `packages/bundle/web-app/cordis.patch.yml` 与 `package.json`、根 `pnpm-workspace.yaml` 的 peer 放行）。
+- **默认启用 WSL 工作区**：`dsh-wsl-workspace` 插件（侧边栏底部 Settings 旁的 **W 按钮**）——从 Web GUI 添加 WSL 发行版工作区，bash 与文件工具直接在 WSL 内运行（VS Code Remote-WSL 风格），无需在 WSL 里安装 sshd/工具链。
 - **完整 Web UI**：官方 dsh web 界面原样呈现，全部功能可用。
 - **独立用户数据**：DSH_HOME 指向 `%APPDATA%/dsh-desktop/home`（Windows）或 `~/.config/dsh-desktop/home`（Linux），与命令行 `~/.dsh` 互不干扰。
 - 系统托盘驻留、退出时有序停服（SIGTERM → 超时强杀，避免孤儿进程）。

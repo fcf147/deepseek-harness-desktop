@@ -1507,6 +1507,9 @@ importers:
       dsh-remote:
         specifier: ^0.5.4
         version: 0.5.4(@deepseek-ai/cordis@vendor+cordis)(@deepseek-ai/dsh-client-runtime@packages+client+runtime)(@deepseek-ai/dsh-client-ui-workspace@packages+client+ui-workspace)(@deepseek-ai/dsh-commands@packages+interaction+commands)(@deepseek-ai/dsh-host-webserver@packages+host+webserver)(@deepseek-ai/dsh-system-prompt@packages+core+system-prompt)(@deepseek-ai/dsh-tools@packages+core+tools)
+      dsh-wsl-workspace:
+        specifier: ^0.2.3
+        version: 0.2.3(@deepseek-ai/cordis@vendor+cordis)(@deepseek-ai/dsh-fs-local@packages+fs+fs-local)(@deepseek-ai/dsh-fs@packages+fs+fs)(@deepseek-ai/dsh-shell@packages+shell+shell)(@deepseek-ai/dsh-subprocess@packages+subprocess+subprocess)(@deepseek-ai/dsh-timeout@packages+util+timeout)
       dshmarket:
         specifier: ^1.9.0
         version: 1.9.0(@deepseek-ai/cordis@vendor+cordis)
@@ -12192,6 +12195,16 @@ packages:
       '@deepseek-ai/dsh-system-prompt': ^0.1.0-rc.6
       '@deepseek-ai/dsh-tools': ^0.1.0-rc.6
 
+  dsh-wsl-workspace@0.2.3:
+    resolution: {integrity: sha512-3L8zcNFLi8WU3OM0nVrm2wLG/6gtKKRzKMPznRIxJ1iAmzALLzkaO/HmVDKJWC0uzdRjZ+f3aKuGk/dVJfwY8g==}
+    peerDependencies:
+      '@deepseek-ai/cordis': '*'
+      '@deepseek-ai/dsh-fs': '*'
+      '@deepseek-ai/dsh-fs-local': '*'
+      '@deepseek-ai/dsh-shell': '*'
+      '@deepseek-ai/dsh-subprocess': '*'
+      '@deepseek-ai/dsh-timeout': '*'
+
   dshmarket@1.9.0:
     resolution: {integrity: sha512-WUeo31GkItN1V2P3Uo8IwMqLzApws7Sk7Q8/1zPMy5tgDCJG3SmZlfSNeG/2uzfygPmnAOI4hjZ6MAqC2k+IVw==}
     peerDependencies:
@@ -17389,6 +17402,15 @@ snapshots:
       '@deepseek-ai/dsh-tools': link:packages/core/tools
       '@deepseek-ai/schemastery': link:vendor/schemastery
       ssh2: 1.17.0
+
+  dsh-wsl-workspace@0.2.3(@deepseek-ai/cordis@vendor+cordis)(@deepseek-ai/dsh-fs-local@packages+fs+fs-local)(@deepseek-ai/dsh-fs@packages+fs+fs)(@deepseek-ai/dsh-shell@packages+shell+shell)(@deepseek-ai/dsh-subprocess@packages+subprocess+subprocess)(@deepseek-ai/dsh-timeout@packages+util+timeout):
+    dependencies:
+      '@deepseek-ai/cordis': link:vendor/cordis
+      '@deepseek-ai/dsh-fs': link:packages/fs/fs
+      '@deepseek-ai/dsh-fs-local': link:packages/fs/fs-local
+      '@deepseek-ai/dsh-shell': link:packages/shell/shell
+      '@deepseek-ai/dsh-subprocess': link:packages/subprocess/subprocess
+      '@deepseek-ai/dsh-timeout': link:packages/util/timeout
 
   dshmarket@1.9.0(@deepseek-ai/cordis@vendor+cordis):
     dependencies:

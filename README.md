@@ -1,12 +1,12 @@
 # DeepSeek Harness — 桌面化定制工程（单仓库）
 
-> **第三方插件声明**：本仓库默认启用的 5 个插件（`dsh-remote`、`dshmarket`、`dsh-message-edit`、`@dsh-external/dsh-vision-toolkit`、`dsh-memory-evolve`）**均为第三方开源插件，非 DeepSeek 官方出品，亦非 DeepSeek 背书**；它们由本仓库维护者自选启用（默认挂载是**本仓库的定制行为**，通过补丁落地，见「对官方仓库的修改」），官方 [`deepseek-harness`](https://github.com/deepseek-ai/deepseek-harness) 默认并不启用它们。不需要的插件可删除 `packages/bundle/web-app/cordis.patch.yml` 中对应行后重新构建关闭。
+> **第三方插件声明**：本仓库默认启用的 6 个插件（`dsh-remote`、`dshmarket`、`dsh-message-edit`、`@dsh-external/dsh-vision-toolkit`、`dsh-memory-evolve`、`dsh-wsl-workspace`）**均为第三方开源插件，非 DeepSeek 官方出品，亦非 DeepSeek 背书**；它们由本仓库维护者自选启用（默认挂载是**本仓库的定制行为**，通过补丁落地，见「对官方仓库的修改」），官方 [`deepseek-harness`](https://github.com/deepseek-ai/deepseek-harness) 默认并不启用它们。不需要的插件可删除 `packages/bundle/web-app/cordis.patch.yml` 中对应行后重新构建关闭。
 
 > **版本基线说明**：本仓库基于官方 [`deepseek-harness`](https://github.com/deepseek-ai/deepseek-harness) 的 **`0.1.0-rc.5` 完整源码快照**（`repo/deepseek-harness-master/`）定制。npm 上最新已发布 `0.1.0-rc.6`，但 **rc.6 为 CLI 聚合包（编译产物），不是完整 monorepo 源码树**，且其与 rc.5 源码树存在差异（provider 适配、cordis patch 兼容层有改动），补丁无法直接迁移。因此本仓库**有意锁定 rc.5 基线**以保证构建可复现；升级路径见「升级官方基线」章节。
 
 基于官方 [`deepseek-harness`](https://github.com/deepseek-ai/deepseek-harness)（基线 `0.1.0-rc.5`）的定制仓库，包含两项核心工作：
 
-1. **开箱即用 SSH 远程开发**：web profile 默认启用 5 个第三方插件（`dsh-remote`、`dshmarket`、`dsh-message-edit`、`@dsh-external/dsh-vision-toolkit`、`dsh-memory-evolve`）。
+1. **开箱即用 SSH 远程开发 + WSL 工作区**：web profile 默认启用 6 个第三方插件（`dsh-remote`、`dshmarket`、`dsh-message-edit`、`@dsh-external/dsh-vision-toolkit`、`dsh-memory-evolve`、`dsh-wsl-workspace`）。
 2. **桌面化**：`desktop/`（Electron 壳，用户免装 Node.js）+ `harmony/`（鸿蒙 ArkWeb 客户端）。
 
 ### 默认插件的来源与为什么默认启用
@@ -18,6 +18,7 @@
 | `dsh-message-edit` | npm registry | 分支式消息编辑、reroll、重试与版本时间线 |
 | `@dsh-external/dsh-vision-toolkit` | npm registry（`@dsh-external` scope） | 图像问答、OCR、定位、界面还原、像素级对比 |
 | `dsh-memory-evolve` | **GitHub 外部组织 [`dsh-external`](https://github.com/dsh-external)**（git 依赖 `github:dsh-external/dsh-memory-evolve#1aca4c4`，**非 DeepSeek 官方**） | 跨会话长期记忆 + 后台自我进化，与 dsh 的上下文机制互补，日常使用价值高 |
+| `dsh-wsl-workspace` | npm registry | WSL 工作区（VS Code Remote-WSL 风格）：从 Web GUI 添加 WSL 发行版工作区，bash 与文件工具直接在 WSL 内运行，**无需在 WSL 里安装 sshd/工具链** |
 
 > 其中 `dsh-memory-evolve` 仅发布在 GitHub（npm 上为私有包），未走 npm registry，故以 git 依赖声明；其源码快照随本仓库预置在 `repo/vendor/dsh-memory-evolve/` 供离线构建使用，可自行审计。
 
@@ -29,6 +30,7 @@
 
 - `dsh-remote`、`dshmarket`、`dsh-message-edit`、`@dsh-external/dsh-vision-toolkit`（第三方，npm）
 - `dsh-memory-evolve`（第三方，GitHub git 依赖，自带 bundle patch 自动注册）
+- `dsh-wsl-workspace`（第三方，npm；WSL 工作区：bash + 文件工具直接在 WSL 发行版内运行，侧边栏 W 按钮添加）
 - `@deepseek-ai/dsh-mcp-client` × 2（**新增**：官方 MCP client 桥接，预置 filesystem 安全演示 MCP，工具名 `mcp__filesystem__*`。注：曾预置 sqlite 演示 MCP，官方 servers 的 npm 包不存在 `@modelcontextprotocol/server-sqlite`，已移除）
 
 > 官方已默认启用的会话基础设施（无需配置）：`session-persistence-jsonl`（zstd 持久化）、`session-log-export`（会话导出）、`session-query-sqlite`（会话查询）、`plan-mode`（plan 模式）、skill 全家（registry / filesystem / tool）。
@@ -163,8 +165,8 @@ Get-FileHash '.\dsh-runtime.7z' -Algorithm SHA256
 | 文件 | 改动 | 目的 |
 |---|---|---|
 | `apps/cli/package.json` | 补充 19 个 `@deepseek-ai/*` workspace 依赖 | 桌面版 `pnpm deploy` 只装生产依赖，插件「模块回退目录」需要完整依赖闭包，否则 hoisted 布局下运行时 `Cannot find package` |
-| `packages/bundle/web-app/cordis.patch.yml` | 宿主行新增 5 个第三方插件行 | 「默认启用 5 个插件」的落地位置 |
-| `packages/bundle/web-app/package.json` | 补充 5 个插件依赖（其中 `dsh-memory-evolve` 为 git 依赖，钉在提交 `1aca4c4`） | 声明插件依赖 |
+| `packages/bundle/web-app/cordis.patch.yml` | 宿主行新增 6 个第三方插件行 | 「默认启用 6 个插件」的落地位置 |
+| `packages/bundle/web-app/package.json` | 补充 6 个插件依赖（其中 `dsh-memory-evolve` 为 git 依赖，钉在提交 `1aca4c4`） | 声明插件依赖 |
 | `pnpm-workspace.yaml` | ① 放宽 dsh-remote 的 6 个 `@deepseek-ai/*` peer 范围（rc.6 → rc.5）；② 放行 `ssh2`/`cpu-features` 构建脚本；③ `minimumReleaseAgeExclude` 放行 `dshmarket@1.9.0` | 让插件在 rc.5 基线下可安装、可构建 |
 
 > **关于 `minimumReleaseAgeExclude`（已知的 pnpm 门禁放宽）**：pnpm 10 默认拒绝安装**发布不足 72 小时**的新包（`minimumReleaseAge`，防供应链投毒的时间窗口）。`dshmarket@1.9.0` 发布尚不足该期限，故在此显式放行；**仅针对这一个包**，其余包仍受门禁保护。该条目随包龄增长自动失效，届时可从配置移除。
