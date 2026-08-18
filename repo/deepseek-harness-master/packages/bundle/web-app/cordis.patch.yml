@@ -122,14 +122,15 @@
       name: 'dsh-memory-evolve'
     # MCP (Model Context Protocol) client bridge, enabled by default: connects
     # to external MCP servers and registers their tools on ctx.tools under
-    # mcp__<serverName>__<rawName>. Two safe demo servers are pre-wired:
+    # mcp__<serverName>__<rawName>. One safe demo server is pre-wired:
     #   - mcp-filesystem: official filesystem server, scoped to the session
     #     working directory (read/write within it)
-    #   - mcp-sqlite: official sqlite server for local query demos; the demo
-    #     database is seeded at first desktop launch (see desktop/main.js)
-    # Both spawn via `npx -y` (needs network on first run); failOnStartupError
-    # stays false so a missing/offline server does not block dsh startup.
-    # Remove a row to disable that server; add rows to connect your own.
+    # (mcp-sqlite was removed: the official servers package has no npm
+    #  `@modelcontextprotocol/server-sqlite`, so npx -y failed with 404.)
+    # Server spawns via `npx -y` (needs network on first run);
+    # failOnStartupError stays false so a missing/offline server does not
+    # block dsh startup. Remove a row to disable that server; add rows to
+    # connect your own.
     - id: mcp-filesystem
       name: '@deepseek-ai/dsh-mcp-client'
       config:
@@ -137,16 +138,6 @@
         transport: stdio
         command: npx
         args: ['-y', '@modelcontextprotocol/server-filesystem', '!!js process.cwd()']
-        cwd: !!js process.cwd()
-        failOnStartupError: false
-
-    - id: mcp-sqlite
-      name: '@deepseek-ai/dsh-mcp-client'
-      config:
-        serverName: sqlite
-        transport: stdio
-        command: npx
-        args: ['-y', '@modelcontextprotocol/server-sqlite', '--db-path', '!!js process.cwd() + "/.dsh-mcp-demo.sqlite"']
         cwd: !!js process.cwd()
         failOnStartupError: false
 

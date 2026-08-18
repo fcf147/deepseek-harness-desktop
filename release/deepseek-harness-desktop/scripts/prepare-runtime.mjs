@@ -38,6 +38,7 @@ import {
   readdirSync,
   statSync,
   readlinkSync,
+  readFileSync,
 } from 'node:fs'
 import { pipeline } from 'node:stream/promises'
 import { Readable } from 'node:stream'
@@ -119,9 +120,9 @@ async function extractArchive(archive, destDir, platform) {
       rmSync(inner, { recursive: true, force: true })
     }
   } else {
-    // tar.xz 免安装包。
-    const { default: tar } = await import('tar')
-    await tar.x({ file: archive, cwd: destDir, strip: 1 })
+    // tar.xz 免安装包。tar v7 的 ESM 无 default 导出，需用 named export。
+    const { x: tarExtract } = await import('tar')
+    await tarExtract({ file: archive, cwd: destDir, strip: 1 })
   }
 }
 
@@ -421,39 +422,133 @@ const EXCLUDE_PLATFORM_PKGS = [
   '@openai/codex-win32-x64',
 ]
 
-function copyPlatformPackages(dest, repoDir, platform) {
+/** 平台分包后缀（用于从平台包名推导主包名）。 */
+const PLATFORM_SUFFIX_RE = /-(win32|linux|darwin|freebsd|openbsd|musl)[a-z0-9_-]*$/
+
+function readPkgVersion(pkgJsonPath) {
+  try {
+    return JSON.parse(readFileSync(pkgJsonPath, 'utf8')).version
+  } catch {
+    return null
+  }
+}
+
+/** 在 runtime node_modules 中查找平台包对应的主包（如 @koromix/koffi-win32-x64 -> koffi）。 */
+function findMainPackage(nodeModules, pkgName) {
+  const parts = pkgName.split('/')
+  const base = parts.pop().replace(PLATFORM_SUFFIX_RE, '')
+  const scope = parts.length ? parts[0] : null
+  const candidates = scope ? [`${scope}/${base}`, base] : [base]
+  for (const c of candidates) {
+    if (existsSync(path.join(nodeModules, ...c.split('/'), 'package.json'))) return c
+  }
+  return candidates[0]
+}
+
+/**
+ * 从 npm registry 下载平台包 tarball 并解压到 targetDir（不含平台后缀的裸名目录）。
+ * 平台包版本必须与主包版本一致（koffi 等在加载时校验 native 模块版本，
+ * 不一致抛 "Mismatched native Koffi modules"）。
+ */
+async function downloadPlatformPkg(pkgName, version, target) {
+  // 解压到临时目录（tgz 顶层为 package/，strip 1 后内容落在临时目录），
+  // 再整体移动到 target（node_modules/<scope>/<name> 完整包路径）。
+  const bare = pkgName.split('/').pop()
+  const encoded = pkgName.startsWith('@')
+    ? `@${encodeURIComponent(pkgName.split('/')[0].slice(1))}/${encodeURIComponent(pkgName.split('/')[1])}`
+    : encodeURIComponent(pkgName)
+  const url = `${process.env.NPM_REGISTRY || 'https://registry.npmjs.org'}/${encoded}/-/${bare}-${version}.tgz`
+  const tmp = path.join(os.tmpdir(), `dsh-pkg-${Date.now()}`)
+  const tmpTgz = `${tmp}.tgz`
+  mkdirSync(tmp, { recursive: true })
+  try {
+    log(`下载平台包 ${pkgName}@${version}: ${url}`)
+    const resp = await fetch(url)
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+    await pipeline(Readable.fromWeb(resp.body), createWriteStream(tmpTgz))
+    const { x: tarExtract } = await import('tar')
+    await tarExtract({ file: tmpTgz, cwd: tmp, strip: 1 })
+    if (!existsSync(path.join(tmp, 'package.json'))) throw new Error('解压后缺少 package.json')
+    rmSync(target, { recursive: true, force: true })
+    mkdirSync(path.dirname(target), { recursive: true })
+    cpSync(tmp, target, { recursive: true })
+  } finally {
+    rmSync(tmp, { recursive: true, force: true })
+    rmSync(tmpTgz, { force: true })
+  }
+}
+
+/**
+ * 从 repo 的 pnpm 虚拟 store（node_modules/.pnpm）把目标平台的平台分包
+ * （@koromix/koffi-win32-x64、@img/sharp-<platform>、node-addon-require-builtin-<platform>
+ * 等）补齐到 deploy 产物 node_modules，并保证平台包版本与 runtime 中主包版本
+ * 一致（koffi/sharp 等在加载时校验 native 版本，不一致会抛
+ * "Mismatched native Koffi modules" 导致 dsh 无法启动）。
+ *
+ * 背景：pnpm deploy --legacy 对 optionalDependencies 的平台包选择不完整
+ * （sharp 的全平台 optionalDeps 一个都没装，koffi 只装宿主版），且 deploy 的
+ * 版本解析可能比 repo lockfile 新（如 koffi 主包解析到 3.1.5 而 lock 钉 3.1.1），
+ * 导致 repo store 里的平台包版本与 deploy 主包不一致。本函数：
+ *   1) 按 runtime 主包版本优先从 store 复制匹配版本；
+ *   2) 否则从 npm registry 下载对应版本。
+ * 已匹配（版本一致）的跳过，幂等。
+ */
+async function copyPlatformPackages(dest, repoDir, platform) {
   const store = path.join(repoDir, 'node_modules', '.pnpm')
+  const nodeModules = path.join(dest, 'node_modules')
   if (!existsSync(store)) return 0
   const marker = `-${platform}-`
-  let count = 0
-  const copyPkg = (srcDir, pkgName) => {
-    if (EXCLUDE_PLATFORM_PKGS.includes(pkgName)) {
-      log(`跳过外部 CLI 平台包（体积过大）: ${pkgName}`)
-      return
-    }
-    const target = path.join(dest, 'node_modules', ...pkgName.split('/'))
-    if (existsSync(target)) return
-    mkdirSync(path.dirname(target), { recursive: true })
-    cpSync(srcDir, target, { recursive: true })
-    count++
-  }
+  const want = new Set()
   for (const entry of readdirSync(store)) {
     if (!entry.includes(marker)) continue
-    const nodeModules = path.join(store, entry, 'node_modules')
-    if (!existsSync(nodeModules)) continue
-    for (const top of readdirSync(nodeModules)) {
-      const topPath = path.join(nodeModules, top)
+    const nm = path.join(store, entry, 'node_modules')
+    if (!existsSync(nm)) continue
+    for (const top of readdirSync(nm)) {
+      const topPath = path.join(nm, top)
       if (!statSync(topPath).isDirectory() || top === '.pnpm') continue
       if (top.startsWith('@')) {
         for (const name of readdirSync(topPath)) {
-          if (name.includes(marker)) copyPkg(path.join(topPath, name), `${top}/${name}`)
+          if (name.includes(marker)) want.add(`${top}/${name}`)
         }
       } else if (top.includes(marker)) {
-        copyPkg(topPath, top)
+        want.add(top)
       }
     }
   }
-  if (count > 0) log(`补齐 ${platform} 平台包 ${count} 个（自 repo pnpm store）`)
+  let count = 0
+  for (const pkgName of want) {
+    if (EXCLUDE_PLATFORM_PKGS.includes(pkgName)) {
+      log(`跳过外部 CLI 平台包（体积过大）: ${pkgName}`)
+      continue
+    }
+    const main = findMainPackage(nodeModules, pkgName)
+    const mainPkg = path.join(nodeModules, ...main.split('/'), 'package.json')
+    if (!existsSync(mainPkg)) continue // 主包不在 runtime（构建工具类平台包），无需对齐
+    const mainVer = readPkgVersion(mainPkg)
+    if (!mainVer) continue
+    const target = path.join(nodeModules, ...pkgName.split('/'))
+    const tver = existsSync(path.join(target, 'package.json'))
+      ? readPkgVersion(path.join(target, 'package.json'))
+      : null
+    if (tver === mainVer) continue // 已匹配
+    if (tver) log(`平台包版本不匹配 ${pkgName}@${tver} vs 主包 ${main}@${mainVer}，修正…`)
+    rmSync(target, { recursive: true, force: true })
+    const storeEntry = path.join(store, `${pkgName.replace('/', '+')}@${mainVer}`)
+    const storeSrc = path.join(storeEntry, 'node_modules', ...pkgName.split('/'))
+    if (existsSync(storeSrc)) {
+      mkdirSync(path.dirname(target), { recursive: true })
+      cpSync(storeSrc, target, { recursive: true })
+      count++
+      continue
+    }
+    try {
+      await downloadPlatformPkg(pkgName, mainVer, target)
+      count++
+    } catch (e) {
+      log(`警告: 无法获取 ${pkgName}@${mainVer}: ${e.message}`)
+    }
+  }
+  if (count > 0) log(`对齐/补齐 ${platform} 平台包 ${count} 个`)
   return count
 }
 
@@ -503,7 +598,7 @@ async function main() {
   restoreVendoredOverrides(path.join(RUNTIME_ROOT, 'dsh'), args.repo)
   // deploy --legacy 对平台分包（sharp/koffi 的 optionalDeps）选择不完整，
   // 从 repo pnpm store 补齐目标平台原生模块。
-  copyPlatformPackages(path.join(RUNTIME_ROOT, 'dsh'), args.repo, args.platform)
+  await copyPlatformPackages(path.join(RUNTIME_ROOT, 'dsh'), args.repo, args.platform)
   // deploy 产物中的符号链接（node_modules/.bin 等）必须展开为普通文件，
   // 否则 Windows 安装器解压 dsh-runtime.7z 会失败。
   dereferenceLinks(path.join(RUNTIME_ROOT, 'dsh'))

@@ -77,8 +77,8 @@ DeepSeek Harness 的**桌面发行版**：Electron 壳 + 内置免安装 Node.js
 见随包 `sha256sums.txt`：
 
 ```
-177ee3bb73f25b2f78de4b045840299556edd1d66662a77c5b269ba9fbbe8e69  DeepSeek Harness-0.1.2-win-setup.exe
-9b05e5bb3b9d96c968bce2ef98344a658bff14966058a4668fb530815adc8ad0  dsh-runtime.7z
+8cfee9f66d8eb8e8eca443d02f19ed70567cfe8ef36698ad29e67e5270825c74  DeepSeek Harness-0.1.2-win-setup.exe
+a2428709c3b2aef602dd9de18acafa876748c39e0aaf4ed78332a73f2e26f1bd  dsh-runtime.7z
 ```
 
 校验命令：

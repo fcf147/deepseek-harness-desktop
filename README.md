@@ -29,7 +29,7 @@
 
 - `dsh-remote`、`dshmarket`、`dsh-message-edit`、`@dsh-external/dsh-vision-toolkit`（第三方，npm）
 - `dsh-memory-evolve`（第三方，GitHub git 依赖，自带 bundle patch 自动注册）
-- `@deepseek-ai/dsh-mcp-client` × 2（**新增**：官方 MCP client 桥接，预置 filesystem + sqlite 两个安全演示 MCP，工具名 `mcp__filesystem__*` / `mcp__sqlite__*`）
+- `@deepseek-ai/dsh-mcp-client` × 2（**新增**：官方 MCP client 桥接，预置 filesystem 安全演示 MCP，工具名 `mcp__filesystem__*`。注：曾预置 sqlite 演示 MCP，官方 servers 的 npm 包不存在 `@modelcontextprotocol/server-sqlite`，已移除）
 
 > 官方已默认启用的会话基础设施（无需配置）：`session-persistence-jsonl`（zstd 持久化）、`session-log-export`（会话导出）、`session-query-sqlite`（会话查询）、`plan-mode`（plan 模式）、skill 全家（registry / filesystem / tool）。
 
