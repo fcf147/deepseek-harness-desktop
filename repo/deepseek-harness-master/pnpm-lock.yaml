@@ -1500,7 +1500,7 @@ importers:
         version: 15.0.0
       dsh-memory-evolve:
         specifier: github:dsh-external/dsh-memory-evolve#1aca4c49f23116e05f9ee645265bcdcf7e50d9a0
-        version: git+https://github.com/dsh-external/dsh-memory-evolve.git#1aca4c49f23116e05f9ee645265bcdcf7e50d9a0
+        version: git+ssh://git@github.com/dsh-external/dsh-memory-evolve.git#1aca4c49f23116e05f9ee645265bcdcf7e50d9a0
       dsh-message-edit:
         specifier: ^0.2.2
         version: 0.2.2
@@ -12174,8 +12174,8 @@ packages:
   dompurify@3.4.11:
     resolution: {integrity: sha512-zhlUV12GsaRzMsf9q5M254YhA4+VuF0fG+QFqu6aYpoGlKtz+w8//jBcGVYBgQkR5GHjUomejY84AV+/uPbWdw==}
 
-  dsh-memory-evolve@git+https://github.com/dsh-external/dsh-memory-evolve.git#1aca4c49f23116e05f9ee645265bcdcf7e50d9a0:
-    resolution: {commit: 1aca4c49f23116e05f9ee645265bcdcf7e50d9a0, repo: https://github.com/dsh-external/dsh-memory-evolve.git, type: git}
+  dsh-memory-evolve@git+ssh://git@github.com/dsh-external/dsh-memory-evolve.git#1aca4c49f23116e05f9ee645265bcdcf7e50d9a0:
+    resolution: {commit: 1aca4c49f23116e05f9ee645265bcdcf7e50d9a0, repo: git@github.com:dsh-external/dsh-memory-evolve.git, type: git}
     version: 0.1.0
 
   dsh-message-edit@0.2.2:
@@ -17374,7 +17374,7 @@ snapshots:
     optionalDependencies:
       '@types/trusted-types': 2.0.7
 
-  dsh-memory-evolve@git+https://github.com/dsh-external/dsh-memory-evolve.git#1aca4c49f23116e05f9ee645265bcdcf7e50d9a0: {}
+  dsh-memory-evolve@git+ssh://git@github.com/dsh-external/dsh-memory-evolve.git#1aca4c49f23116e05f9ee645265bcdcf7e50d9a0: {}
 
   dsh-message-edit@0.2.2: {}
 

@@ -125,11 +125,11 @@ async function extractArchive(archive, destDir, platform) {
 }
 
 function readSingleChildDir(dir) {
-  const entries = readdirSync(dir)
-  if (entries.length === 1) {
-    const candidate = path.join(dir, entries[0])
-    if (existsSync(candidate) && statSync(candidate).isDirectory()) return candidate
-  }
+  const entries = readdirSync(dir).filter((entry) => {
+    const candidate = path.join(dir, entry)
+    return existsSync(candidate) && statSync(candidate).isDirectory()
+  })
+  if (entries.length === 1) return path.join(dir, entries[0])
   return null
 }
 
@@ -205,6 +205,38 @@ async function provisionPnpm(args) {
   if (!existsSync(nodeExe)) fail(`内置 Node 缺失: ${nodeExe}`)
   if (!existsSync(npmCli)) fail(`内置 npm 缺失: ${npmCli}（免安装 Node 发行版应自带 npm）`)
   const version = process.env.DSH_DESKTOP_PNPM_VERSION || '10'
+
+  // 交叉构建（如 Linux 上构建 win32）：目标平台的 node.exe 无法在宿主执行。
+  // 改为用宿主 npm 把 pnpm 包装入目标 node 的 node_modules，再按 Windows 全局
+  // 安装布局生成 pnpm.cmd / pnpm.ps1 shim（npm -g 在 Windows 上的等价产物）。
+  if (args.platform !== process.platform) {
+    log(`交叉构建 ${args.platform}，用宿主 npm 安装 pnpm@${version} 并生成 shim`)
+    const stage = path.join(os.tmpdir(), `dsh-pnpm-${Date.now()}`)
+    mkdirSync(stage, { recursive: true })
+    try {
+      const result = spawnSync(process.execPath, [npmCli, 'install', '--prefix', stage, `pnpm@${version}`, '--no-save', '--no-audit', '--no-fund'], {
+        stdio: 'inherit',
+      })
+      if (result.status !== 0) {
+        fail(`pnpm 安装失败 (exit=${result.status})。如网络受限，请先配置 npm registry 镜像（npm config set registry https://registry.npmmirror.com）后重试`)
+      }
+      const pkgSource = path.join(stage, 'node_modules', 'pnpm')
+      if (!existsSync(path.join(pkgSource, 'bin', 'pnpm.cjs'))) {
+        fail(`宿主 npm 未产出 pnpm 包: ${pkgSource}`)
+      }
+      mkdirSync(path.join(nodeDir, 'node_modules'), { recursive: true })
+      cpSync(pkgSource, path.join(nodeDir, 'node_modules', 'pnpm'), { recursive: true })
+      writeFileSync(path.join(nodeDir, 'pnpm.cmd'),
+        '@ECHO off\r\nGOTO start\r\n:find_dp0\r\nSET dp0=%~dp0\r\nEXIT /b\r\n:start\r\nSETLOCAL\r\nCALL :find_dp0\r\n\r\nIF EXIST "%dp0%\\node.exe" (\r\n  SET "_prog=%dp0%\\node.exe"\r\n) ELSE (\r\n  SET "_prog=node"\r\n  SET PATHEXT=%PATHEXT:;.JS;=;%\r\n)\r\n\r\nendLocal & goto #_undefined_# 2>NUL || title %COMSPEC% & "%_prog%"  "%dp0%\\node_modules\\pnpm\\bin\\pnpm.cjs" %*\r\n')
+      writeFileSync(path.join(nodeDir, 'pnpm.ps1'),
+        '#!/usr/bin/env pwsh\r\n$basedir=Split-Path $MyInvocation.MyCommand.Definition -Parent\r\n\r\n$exe=""\r\nif ($PSVersionTable.PSVersion -lt "6.0" -or $IsWindows) {\r\n  $exe=".exe"\r\n}\r\n$ret=0\r\nif (Test-Path "$basedir/node$exe") {\r\n  if ($MyInvocation.ExpectingInput) {\r\n    $input | & "$basedir/node$exe"  "$basedir/node_modules/pnpm/bin/pnpm.cjs" $args\r\n  } else {\r\n    & "$basedir/node$exe"  "$basedir/node_modules/pnpm/bin/pnpm.cjs" $args\r\n  }\r\n  $ret=$LASTEXITCODE\r\n} else {\r\n  if ($MyInvocation.ExpectingInput) {\r\n    $input | & "node$exe"  "$basedir/node_modules/pnpm/bin/pnpm.cjs" $args\r\n  } else {\r\n    & "node$exe"  "$basedir/node_modules/pnpm/bin/pnpm.cjs" $args\r\n  }\r\n  $ret=$LASTEXITCODE\r\n}\r\nexit $ret\r\n')
+      log(`pnpm 就绪: ${probe}`)
+      return
+    } finally {
+      rmSync(stage, { recursive: true, force: true })
+    }
+  }
+
   log(`安装 pnpm@${version} 到内置 Node 目录: ${nodeDir}`)
   const result = spawnSync(nodeExe, [npmCli, 'install', '-g', `pnpm@${version}`, '--prefix', nodeDir], {
     stdio: 'inherit',
