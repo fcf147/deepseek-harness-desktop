@@ -1,6 +1,6 @@
 {
   "name": "dsh-desktop",
-  "version": "0.1.4",
+  "version": "0.1.2",
   "description": "DeepSeek Harness 桌面壳（Windows + Linux rpm）：内置 Node.js 运行时与 dsh 完整安装，无需用户安装 Node.js；默认启用 SSH 远程开发（dsh-remote）。",
   "license": "MIT",
   "main": "main.js",
