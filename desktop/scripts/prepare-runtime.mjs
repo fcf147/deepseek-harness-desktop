@@ -3,10 +3,9 @@
  * 组装桌面版 runtime 目录：
  *
  *   runtime/
- *     node/<platform>-<arch>/           内置免安装 Node.js 运行时
- *       win32-x64/node.exe
- *       linux-x64/bin/node (+lib, share)
- *       linux-arm64/bin/node ...
+ *     node/<platform>-<arch>/           内置免安装 Node.js 运行时（仅 Windows 等目标内置；
+ *       win32-x64/node.exe              linux 目标不下载/不内置，运行时由 main.js
+ *       linux-x64/bin/node (+lib, share)  检测系统 Node 并按发行版提示补全）
  *     dsh/                              dsh 安装根（含 node_modules 闭包）
  *       node_modules/@deepseek-ai/dsh/lib/bin.js
  *     templates/profiles/web/          web profile 骨架（复制到用户数据目录）
@@ -14,9 +13,14 @@
  * dsh 安装根用 pnpm deploy 从官方仓库组装：它会把 @deepseek-ai/dsh 及其
  * 生产依赖扁平化为一个可独立运行的 node_modules，无需用户安装全局 Node.js。
  *
+ * Node 版本策略：Windows 目标构建时从 nodejs.org index.json 动态解析"最新满足
+ * dsh engines（^22.19.0 || >=24.0.0）的 LTS 版本"下载免安装包；可用环境变量
+ * DSH_DESKTOP_NODE_VERSION 固定版本（跳过网络解析），NODE_MIRROR 覆盖镜像。
+ * Linux 目标不内置 Node。
+ *
  * 前置条件（仅构建机需要）：
  *   - 官方仓库已 `pnpm install && pnpm run build`（构建机需要 Node 22+ 与 pnpm）
- *   - 构建机可联网（下载免安装 Node 运行时）
+ *   - 构建机可联网（Windows 目标下载免安装 Node 运行时；linux 目标无需）
  *
  * 用法：
  *   node scripts/prepare-runtime.mjs [--repo <path>] [--platform win32|linux]
@@ -85,15 +89,84 @@ function nodeRuntimeDir(platform, arch) {
   return path.join(RUNTIME_ROOT, 'node', `${platform}-${arch}`)
 }
 
+/** dsh 对 Node 的 engines 要求（repo/package.json 原样）。 */
+const NODE_ENGINES_RANGE = '^22.19.0 || >=24.0.0'
+
+/** 版本是否满足 engines（^22.19.0 即 22.x 且 minor>=19；>=24.0.0 即 major>=24）。 */
+function satisfiesNodeEngines(version) {
+  const m = /^v?(\d+)\.(\d+)\.(\d+)/.exec(version || '')
+  if (!m) return false
+  const major = Number(m[1])
+  const minor = Number(m[2])
+  return (major === 22 && minor >= 19) || major >= 24
+}
+
+/** 带重试退避的 fetch（WSL/弱网下偶发 ETIMEDOUT，重试可扛过抖动）。 */
+async function fetchWithRetry(url, { attempts = 3, timeoutMs = 20000 } = {}) {
+  let lastError
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), timeoutMs)
+      try {
+        return await fetch(url, { signal: controller.signal })
+      } finally {
+        clearTimeout(timer)
+      }
+    } catch (error) {
+      lastError = error
+      if (attempt < attempts) {
+        const delay = attempt * 2000
+        log(`网络请求失败（${error.message}），${delay / 1000}s 后第 ${attempt + 1}/${attempts} 次重试…`)
+        await new Promise((resolve) => setTimeout(resolve, delay))
+      }
+    }
+  }
+  throw lastError
+}
+
 /**
- * 解析 Node 版本并构造下载 URL。默认取 latest 的 v22 LTS 线（满足 dsh 的
- * engines: ^22.19.0 || >=24.0.0），可用环境变量 NODE_MIRROR 覆盖镜像。
+ * 解析"最新符合要求的 Node 版本"：抓取 index.json，过滤满足 engines 的版本，
+ * 优先取最新 LTS（桌面内置优先稳定性），无 LTS 时取满足范围内的最新版。
+ * 可用环境变量 DSH_DESKTOP_NODE_VERSION 固定版本（跳过网络解析）。
  */
-function nodeDownloadInfo(platform, arch) {
-  const version = process.env.DSH_DESKTOP_NODE_VERSION || 'v22.19.0'
+async function resolveNodeVersion(base) {
+  const pinned = process.env.DSH_DESKTOP_NODE_VERSION
+  if (pinned) {
+    log(`Node 版本由 DSH_DESKTOP_NODE_VERSION 固定: ${pinned}`)
+    return pinned.startsWith('v') ? pinned : `v${pinned}`
+  }
+  const indexUrl = `${String(base).replace(/\/+$/, '')}/index.json`
+  log(`解析最新合规 Node 版本: ${indexUrl}`)
+  let releases = null
+  try {
+    const response = await fetchWithRetry(indexUrl)
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    releases = await response.json()
+  } catch (error) {
+    log(`警告: 获取 Node 版本列表失败（${error.message}），回退默认 v22.19.0`)
+    return 'v22.19.0'
+  }
+  const compliant = releases.filter((r) => satisfiesNodeEngines(r.version))
+  if (compliant.length === 0) {
+    log(`警告: 没有满足 ${NODE_ENGINES_RANGE} 的 Node 版本，回退默认 v22.19.0`)
+    return 'v22.19.0'
+  }
+  const lts = compliant.find((r) => r.lts)
+  const chosen = lts || compliant[0]
+  log(`选择 Node ${chosen.version}${chosen.lts ? `（LTS ${chosen.lts}）` : '（最新非 LTS）'}`)
+  return chosen.version
+}
+
+/**
+ * 解析 Node 版本并构造下载 URL。版本由 resolveNodeVersion 动态解析（最新合规
+ * LTS），可用环境变量 NODE_MIRROR 覆盖镜像（index.json 与发行包同根）。
+ */
+async function nodeDownloadInfo(platform, arch) {
+  const base = process.env.NODE_MIRROR || 'https://nodejs.org/dist'
+  const version = await resolveNodeVersion(base)
   const suffix = nodeArchiveSuffix(platform, arch)
   if (!suffix) fail(`不支持的平台/架构: ${platform}-${arch}`)
-  const base = process.env.NODE_MIRROR || 'https://nodejs.org/dist'
   const ext = platform === 'win32' ? 'zip' : 'tar.xz'
   const file = `node-${version}-${suffix}.${ext}`
   return { version, url: `${base}/${version}/${file}`, file }
@@ -101,7 +174,8 @@ function nodeDownloadInfo(platform, arch) {
 
 async function download(url, dest) {
   log(`下载 ${url}`)
-  const response = await fetch(url)
+  // 大文件下载也走重试（WSL/弱网偶发 ETIMEDOUT；已落盘的零碎文件先删掉）
+  const response = await fetchWithRetry(url, { attempts: 3, timeoutMs: 120000 })
   if (!response.ok) fail(`下载失败: HTTP ${response.status} ${response.statusText} (${url})`)
   await pipeline(Readable.fromWeb(response.body), createWriteStream(dest))
 }
@@ -152,7 +226,7 @@ async function provisionNode(args) {
     return
   }
 
-  const info = nodeDownloadInfo(args.platform, args.arch)
+  const info = await nodeDownloadInfo(args.platform, args.arch)
   const tmp = path.join(os.tmpdir(), `dsh-node-${Date.now()}`)
   mkdirSync(tmp, { recursive: true })
   try {
@@ -590,8 +664,12 @@ async function main() {
   log(`repo: ${args.repo}`)
   log(`platform: ${args.platform}-${args.arch}`)
   mkdirSync(RUNTIME_ROOT, { recursive: true })
-  await provisionNode(args)
-  await provisionPnpm(args)
+  if (args.platform !== 'linux') {
+    await provisionNode(args)
+    await provisionPnpm(args)
+  } else {
+    log('linux 平台：不内置 Node 运行时（运行时由 main.js 检测系统 Node 并按发行版提示补全），跳过 Node 下载与 pnpm 预置')
+  }
   await deployDsh(args)
   restoreVendoredOverrides(path.join(RUNTIME_ROOT, 'dsh'), args.repo)
   // deploy --legacy 对平台分包（sharp/koffi 的 optionalDeps）选择不完整，

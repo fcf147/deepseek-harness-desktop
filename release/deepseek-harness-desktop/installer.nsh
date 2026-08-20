@@ -1,10 +1,16 @@
-; dsh-desktop NSIS 自定义安装逻辑（拆分发布）。
+; dsh-desktop NSIS 自定义安装逻辑（拆分发布 + Node 随包内置）。
 ;
-; 安装包只含 Electron 壳 + 模板 + 7za 工具；node 运行时与 dsh 安装根在
-; 单独的 dsh-runtime.7z 归档里（与安装包同目录）。customInstall 在应用
-; 文件解压完成后执行（electron-builder installSection.nsh），此处用内置
-; 7za 把归档解压到 $INSTDIR\resources\runtime\，与 main.js 的路径约定
-; （process.resourcesPath/runtime）保持一致。
+; 安装包内嵌 Electron 壳 + 模板 + 7za 工具 + 内置 Node（extraResources 自动落盘到
+; $INSTDIR\resources\runtime\node\win32-x64）；dsh 安装根在单独的
+; dsh-runtime.7z 归档里（与安装包同目录）。
+;
+; customInstall 在应用文件解压完成后执行（electron-builder installSection.nsh）：
+;   1) 检测系统 PATH 中的 Node.js：满足 dsh engines（^22.19.0 || >=24.0.0）时
+;      写 .use-system-node 标记，桌面壳优先复用系统 Node（main.js 会做严格版本
+;      校验，不满足时自动回退内置 Node）；不满足/未安装则静默使用内置 Node
+;      （安装包自带，即"后台静默补齐"，全程离线、无需交互）；
+;   2) 用内置 7za 把 dsh-runtime.7z 解压到 $INSTDIR\resources\runtime\。
+;      （先补齐 Node 依赖，再安装 harness 本体）
 ;
 ; 归档缺失时中止安装并给出明确提示（应用无法工作）。
 
@@ -76,6 +82,31 @@
 !macroend
 
 !macro customInstall
+  ; ===== 1) 检测系统 Node.js，决定复用系统 Node 或静默使用内置 Node =====
+  ; 内置 Node 已随安装包解压（extraResources），无需任何下载；
+  ; 仅当系统 PATH 中存在满足 engines（^22.19.0 || >=24.0.0）的 Node 时写
+  ; .use-system-node 标记让桌面壳优先复用（宽松启发式：v22.*/v24.*/v25.*/v26.*，
+  ; main.js 会做严格 semver 校验并在不满足时回退内置 Node）。
+  DetailPrint "检测系统 Node.js 状态..."
+  nsExec::ExecToStack 'node --version'
+  Pop $0
+  Pop $1
+  ${If} $0 == 0
+    StrCpy $2 $1 4
+    ${If} $2 == "v22."
+    ${OrIf} $2 == "v24."
+    ${OrIf} $2 == "v25."
+    ${OrIf} $2 == "v26."
+      DetailPrint "检测到系统 Node.js $1（满足要求），写入 .use-system-node 标记复用系统 Node。"
+      nsExec::ExecToLog 'cmd /c type nul > "$INSTDIR\resources\runtime\node\.use-system-node"'
+    ${Else}
+      DetailPrint "系统 Node.js $1 版本不满足要求（^22.19.0 || >=24.0.0），静默使用内置 Node。"
+    ${EndIf}
+  ${Else}
+    DetailPrint "未检测到系统 Node.js，静默使用内置 Node（后台补齐依赖）。"
+  ${EndIf}
+
+  ; ===== 2) 解压 dsh 运行时（Node 依赖就绪后再装 harness 本体） =====
   ${If} ${FileExists} "$EXEDIR\dsh-runtime.7z"
     DetailPrint "正在解压 dsh 运行时 (dsh-runtime.7z) ..."
     nsExec::ExecToStack '"$INSTDIR\resources\tools\7za.exe" x "$EXEDIR\dsh-runtime.7z" -y -o"$INSTDIR\resources\runtime"'

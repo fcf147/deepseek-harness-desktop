@@ -1,14 +1,18 @@
 // 一键构建：prepare-runtime -> electron-builder（win nsis / linux rpm）。
 // 用法: node scripts/build.mjs --platform win|linux [--arch x64|arm64]
 //
-// Windows（拆分发布）额外步骤：
+// Windows（拆分发布 + Node 随包内置）：
 //   1) 把 7zip-bin 的 7za.exe 复制到 tools/（随包分发给安装器解压归档用）；
-//   2) electron-builder 打包 exe（只内嵌 Electron + 模板 + tools，< 100MB）；
-//   3) 用 7za 把 runtime/node + runtime/dsh 压缩成 dist/dsh-runtime.7z
-//      （~57MB），与安装包同目录发布。
+//   2) prepare-runtime 动态解析最新合规 Node（engines ^22.19.0 || >=24.0.0）
+//      下载免安装包到 runtime/node/win32-x64，并 pnpm deploy dsh 安装根；
+//   3) electron-builder 打包 exe：Node（extraResources）与 dsh 分置——
+//      Node 直接打入安装包（安装期静默补齐/复用系统 Node 的兜底），
+//      dsh 运行时压缩成 dist/dsh-runtime.7z（~50MB）与安装包同目录发布，
+//      由安装器（installer.nsh）解压到 resources/runtime；
+// Linux rpm：不内置 Node，只随包分发 dsh + profile 模板（运行时检测系统 Node）。
 
 import { spawnSync } from 'node:child_process'
-import { existsSync, readdirSync, statSync, copyFileSync, mkdirSync } from 'node:fs'
+import { existsSync, statSync, copyFileSync, mkdirSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -45,30 +49,15 @@ function run(cmd, cmdArgs, opts = {}) {
   }
 }
 
-// 1) 组装 runtime（内置 Node + dsh 安装根 + profile 模板）
+// 1) 组装 runtime（内置 Node + dsh 安装根 + profile 模板）。
+//    Windows 目标的 Node 版本由 prepare-runtime 动态解析"最新满足 engines 的
+//    LTS"（可用 DSH_DESKTOP_NODE_VERSION 固定）；linux 目标不内置 Node。
 const runtimePlatform = args.platform === 'win' ? 'win32' : args.platform === 'linux' ? 'linux' : args.platform
-// 构建机自带的免安装 Node（.tools/node-*）：有则直接复制进 runtime，避免
-// 在构建/打包机上重复下载（nodejs.org 直连在部分网络不可用且 Node 会崩溃）。
-const toolsRoot = path.resolve(DESKTOP_ROOT, '..', '.tools')
-let bundledNodeDir = null
-if (existsSync(toolsRoot)) {
-  for (const entry of readdirSync(toolsRoot)) {
-    const candidate = path.join(toolsRoot, entry)
-    const probe = process.platform === 'win32'
-      ? path.join(candidate, 'node.exe')
-      : path.join(candidate, 'bin', 'node')
-    if (statSync(candidate).isDirectory() && existsSync(probe)) {
-      bundledNodeDir = candidate
-      break
-    }
-  }
-}
 const prepareArgs = [
   path.join(__dirname, 'prepare-runtime.mjs'),
   '--platform', runtimePlatform,
   '--arch', args.arch,
 ]
-if (bundledNodeDir) prepareArgs.push('--node', bundledNodeDir)
 run(process.execPath, prepareArgs)
 
 // 1.5) Windows 拆分发布：确保 tools/7za.exe 随包分发（安装器用它解压归档）
@@ -108,13 +97,14 @@ const target = args.platform === 'win' ? '--win' : '--linux'
 const archFlag = `--${args.arch === 'arm64' ? 'arm64' : 'x64'}`
 run(process.execPath, [ebCli, target, archFlag], { cwd: DESKTOP_ROOT })
 
-// 3) Windows 拆分发布：压缩 node + dsh 为 dsh-runtime.7z（与安装包同目录）
+// 3) Windows 拆分发布：压缩 dsh 为 dsh-runtime.7z（与安装包同目录）。
+//    Node 已作为 extraResources 直接打入安装包，7z 只含 dsh 安装根。
 if (args.platform === 'win') {
   const runtimeRoot = path.join(DESKTOP_ROOT, 'runtime')
   const archive = path.join(DESKTOP_ROOT, 'dist', 'dsh-runtime.7z')
-  // 归档内保持 node/、dsh/ 顶层结构，解压到 resources\runtime 后与 main.js
+  // 归档内保持 dsh/ 顶层结构，解压到 resources\runtime 后与 main.js
   // 的路径约定一致。
-  run(archiver7z, ['a', '-t7z', '-mx=9', '-mmt=on', '-bso0', '-bsp0', archive, 'node', 'dsh'], {
+  run(archiver7z, ['a', '-t7z', '-mx=9', '-mmt=on', '-bso0', '-bsp0', archive, 'dsh'], {
     cwd: runtimeRoot,
   })
   const stat = statSync(archive)
