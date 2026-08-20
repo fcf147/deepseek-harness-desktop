@@ -32,6 +32,18 @@ peerDependencyRules:
   allowedVersions:
     typescript: '>=5 <7'
 
+# 桌面版构建补充（非官方配置）：允许在 Linux 宿主上交叉构建 Windows 目标时，
+# 同时安装 win32-x64 平台分包（koffi/sharp/node-addon-require-builtin 等）。
+# 无此配置时 Linux store 只有宿主平台原生模块，win32 deploy 产物装上 Windows
+# 启动必崩（session-persistence-jsonl / fs-local 无条件 import koffi）。
+supportedArchitectures:
+  os:
+    - current
+    - win32
+  cpu:
+    - current
+    - x64
+
 # pnpm 10+ blocks any dependency shipping an install/build script until it is
 # explicitly reviewed here (strictDepBuilds defaults to true: an unlisted script
 # is a hard install error). Every such package MUST be listed; we deny by

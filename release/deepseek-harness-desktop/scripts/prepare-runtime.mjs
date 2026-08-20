@@ -420,13 +420,17 @@ async function deployDsh(args) {
 /**
  * 还原仓库 `link:` override 的 vendored 包（vendor/ 下的 rescope 源码）。
  * pnpm --legacy deploy 不会把 link override 指向的目录落入目标 node_modules，
- * 但 cordis 等包运行时直接 import 它们（@deepseek-ai/cosmokit、schemastery）。
- * 幂等：目标已存在则跳过。
+ * 但 cordis 等包运行时直接 import 它们（@deepseek-ai/cosmokit、schemastery、
+ * cordis-plugin-group）。幂等：目标已存在则跳过。
+ * 注：cordis-plugin-group 是 dsh-app-boot 的 peerDependency（workspace:^ →
+ * vendor/group），deploy 参数 auto-install-peers=false 不会自动落盘，须随
+ * cosmokit/schemastery 一并还原，否则 dsh 启动时报 ERR_MODULE_NOT_FOUND。
  */
 function restoreVendoredOverrides(dest, repoDir) {
   const overrides = {
     '@deepseek-ai/cosmokit': path.join(repoDir, 'vendor', 'cosmokit'),
     '@deepseek-ai/schemastery': path.join(repoDir, 'vendor', 'schemastery'),
+    '@deepseek-ai/cordis-plugin-group': path.join(repoDir, 'vendor', 'group'),
   }
   for (const [name, source] of Object.entries(overrides)) {
     if (!existsSync(path.join(source, 'package.json'))) {

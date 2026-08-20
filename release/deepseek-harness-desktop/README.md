@@ -156,12 +156,14 @@ export ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-b
    - `--config.node-linker=hoisted`：扁平化顶层 node_modules。web profile 的模块回退目录（`healProfilesModuleFallback`）按字面路径解析闭包依赖，isolated 布局下嵌套传递依赖不可见。
    - `--config.auto-install-peers=false` / `--config.link-workspace-packages=true`。
    - `--config.blockExoticSubdeps=false`：放行子依赖中的非常规（git/非 registry）来源依赖。
-   - 还原 `link:` override 的 vendored 包（`@deepseek-ai/cosmokit`、`schemastery`），legacy deploy 不会自动落盘。
+   - 还原 `link:` override 的 vendored 包（`@deepseek-ai/cosmokit`、`schemastery`、`cordis-plugin-group`←`vendor/group`），legacy deploy 不会自动落盘；其中 `cordis-plugin-group` 是 `dsh-app-boot` 的 peer（`auto-install-peers=false` 不装），漏掉会 `ERR_MODULE_NOT_FOUND`。
 3. **profile 模板**：写入 `runtime/templates/profiles/web`（官方 web profile）。
 
 ## 对官方仓库的修改
 
 本分支（`yuanbanjiake`）**不修改官方 harness 源码**。`repo/deepseek-harness-master/` 即官方 `deepseek-harness` `0.1.0-rc.8` 的完整源码快照，官方依赖闭包与 peer 范围均已自洽，桌面版 `pnpm deploy` 可直接解析，**无需任何补丁**。`patches/` 目录仅保留历史空壳（`desktop-runtime.patch` 曾在 rc.5 时期补充 19 个 `@deepseek-ai/*` 依赖闭包 + 放宽 peer 范围，rc.8 已不再需要）。
+
+> 对快照的唯一补充：`pnpm-workspace.yaml` 追加 `supportedArchitectures`（os: [current, win32]）——纯构建配置，允许 Linux 宿主交叉构建 Windows 目标时同时安装 win32 平台原生模块（koffi/sharp 等），否则 win32 产物装上 Windows 启动必崩。
 
 > 注：本分支仅保留官方 harness + 桌面壳，未启用任何第三方 / 自定义插件。
 

@@ -49,7 +49,7 @@ desktop/
 
 ## 构建（从零到 exe，需要联网）
 
-构建机要求：Windows 或 Linux x64；Node.js 22+（或任意能跑 pnpm 的 Node）、pnpm ≥ 10、git。**Linux 构建机可直接交叉构建 Windows 安装包**（脚本已适配：pnpm 预置、归档 7za 均按宿主平台处理），**无需 wine**。
+构建机要求：Windows 或 Linux x64；Node.js 22+（或任意能跑 pnpm 的 Node）、pnpm ≥ 10、git。**Linux 构建机可直接交叉构建 Windows 安装包**（脚本已适配：pnpm 预置、归档 7za 均按宿主平台处理），**无需 wine**；交叉构建时还需 wine 供 electron-builder 的 rcedit 注入 exe 资源（不装可 `--config.win.signAndEditExecutable=false` 跳过，代价是 exe 无图标/版本信息）。`repo/pnpm-workspace.yaml` 已含 `supportedArchitectures`（win32），Linux 宿主 install 后 store 会带 win32 平台原生模块，否则 win32 产物在 Windows 上启动必崩。
 
 **前置：`../repo/deepseek-harness-master/` 必须先构建**（`pnpm install && pnpm run build`，产出 `apps/cli/lib/bin.js` 与 web dist）。`prepare-runtime` 的 `pnpm deploy` 依赖它，未构建会直接报「仓库尚未构建」。最省事的方式是先在仓库根目录跑 `node scripts/setup.mjs` 完成全部准备（repo 构建 + desktop 依赖 + runtime 组装），再执行本节命令。
 
