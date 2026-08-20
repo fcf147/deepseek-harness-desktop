@@ -6,7 +6,7 @@
 ## DeepSeek Harness (DSH)
 
 - 项目：https://github.com/deepseek-ai/deepseek-harness
-- 版本基线：`0.1.0-rc.5`（完整源码快照，见 `repo/deepseek-harness-master/`）
+- 版本基线：`0.1.0-rc.8`（完整源码快照，见 `repo/deepseek-harness-master/`）
 - 许可证：MIT
 - 版权：Copyright (c) 2026 DeepSeek
 - 用途：dsh 核心运行时、web profile、CLI；本项目在其上应用补丁并打包为桌面版

@@ -23,7 +23,7 @@ DeepSeek Harness 的桌面发行版：Electron 壳 + 内置免安装 Node.js 运
 │   ├── prepare-runtime.mjs    # 组装 runtime/：内置 Node + pnpm deploy dsh + profile 模板
 │   └── build.mjs              # 一键构建：prepare-runtime -> electron-builder
 ├── patches/
-│   ├── desktop-runtime.patch  # 对官方仓库的全部修改（统一 diff，git apply 即可）
+│   ├── desktop-runtime.patch  # 历史补丁空壳（rc.8 基线无需对官方源码打补丁）
 │   └── README.md              # 补丁说明与应用步骤
 ├── assets/icon.png            # 应用图标
 └── harmony/                   # HarmonyOS ArkWeb 客户端（连接 dsh web 服务）
@@ -65,10 +65,10 @@ git --version
 ### 1. 克隆两个仓库（官方上游 + 本桌面壳仓库）
 
 ```bash
-# 官方 DeepSeek Harness monorepo（基线 0.1.0-rc.5）
+# 官方 DeepSeek Harness monorepo（基线 0.1.0-rc.8）
 git clone https://github.com/deepseek-ai/deepseek-harness.git
 cd deepseek-harness
-git checkout 0.1.0-rc.5   # 锁定基线版本（补丁基于 rc.5 生成）
+git checkout dsh-v0.1.0-rc.8   # 锁定基线版本（最新发布 tag，完整源码树）
 cd ..
 
 # 本仓库（桌面壳 + 补丁 + Harmony 客户端）
@@ -76,17 +76,15 @@ git clone https://gitee.com/summerwindow741/deepseek-harness-desktop.git
 cd deepseek-harness-desktop
 ```
 
-> 若上游无 `0.1.0-rc.5` tag（以 `git tag -l` 为准），可检出对应提交；补丁以 `git apply -p1` 应用，
-> 上下文轻微偏移时可参照 `patches/README.md` 的 fuzz/手动合并说明。
+> 锁定 `dsh-v0.1.0-rc.8` tag 即可。官方 `0.1.0-rc.8` 源码自洽（依赖闭包与 peer 范围均已满足），**无需对官方仓库打补丁**；本仓库 `patches/` 仅保留空壳以备追溯。
 
-### 2. 应用补丁到官方仓库
+### 2. 核对基线（rc.8 无需补丁）
 
-补丁补充 web profile 闭包所需的官方依赖、放宽 peer 范围等：
+确认检出的官方仓库确为 `dsh-v0.1.0-rc.8`：
 
 ```bash
 cd deepseek-harness
-git apply ../deepseek-harness-desktop/patches/desktop-runtime.patch
-# 若报错，先确认基线确为 0.1.0-rc.5；补丁说明见 patches/README.md
+git describe --tags   # 预期：dsh-v0.1.0-rc.8
 ```
 
 ### 3. 构建官方仓库（产出 dsh CLI 产物）
@@ -96,7 +94,7 @@ pnpm install
 pnpm run build
 ```
 
-> `pnpm install` 解析官方依赖闭包；应用补丁后若提示 peer 版本冲突，重新 `pnpm install` 即可；
+> `pnpm install` 解析官方依赖闭包（rc.8 已自洽，peer 无冲突）；
 > `pnpm run build` 产出 `apps/cli/lib/bin.js` 等，供桌面壳 deploy 引用。
 
 ### 4. 安装桌面壳依赖
@@ -162,14 +160,9 @@ export ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-b
 
 ## 对官方仓库的修改
 
-完整差异见 [`patches/desktop-runtime.patch`](patches/desktop-runtime.patch)：1 个源文件改动（`apps/cli/package.json`），外加 `pnpm-workspace.yaml` 的直接修改（不在此补丁内）。本分支（`yuanbanjiake`）已移除全部第三方 / 自定义插件，补丁集因此只保留官方依赖闭包所需的改动：
+本分支（`yuanbanjiake`）**不修改官方 harness 源码**。`repo/deepseek-harness-master/` 即官方 `deepseek-harness` `0.1.0-rc.8` 的完整源码快照，官方依赖闭包与 peer 范围均已自洽，桌面版 `pnpm deploy` 可直接解析，**无需任何补丁**。`patches/` 目录仅保留历史空壳（`desktop-runtime.patch` 曾在 rc.5 时期补充 19 个 `@deepseek-ai/*` 依赖闭包 + 放宽 peer 范围，rc.8 已不再需要）。
 
-| 文件 | 改动 |
-| --- | --- |
-| `apps/cli/package.json` | 补充 19 个 `@deepseek-ai/*` workspace 包到 `dependencies`，使 web profile 闭包（heal 回退）可解析到全部官方依赖 |
-| `pnpm-workspace.yaml`（直接改仓库，不在补丁内） | `peerDependencyRules.allowedVersions` 放宽 6 个 `@deepseek-ai/*` 对 rc.6 的 peer 范围到 rc.5 |
-
-> 注：本分支仅保留官方 harness + 桌面壳，未启用任何第三方 / 自定义插件，故无需 cordis 插件行、插件依赖或 vendor 快照。升级官方基线后若 peer 范围变化，重新生成此补丁即可。
+> 注：本分支仅保留官方 harness + 桌面壳，未启用任何第三方 / 自定义插件。
 
 ## 常见问题
 

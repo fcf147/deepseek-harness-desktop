@@ -31,16 +31,6 @@ overrides:
 peerDependencyRules:
   allowedVersions:
     typescript: '>=5 <7'
-    # dsh-remote 0.5.x declares its @deepseek-ai peer ranges at ^0.1.0-rc.6
-    # while this checkout is rc.5. The APIs it actually uses (defineTool,
-    # systemPrompt, webServer) all exist in rc.5, so relax the peer range
-    # for installation; a future rc.6 checkout can drop this override.
-    '@deepseek-ai/dsh-commands': '>=0.1.0-rc.5'
-    '@deepseek-ai/dsh-host-webserver': '>=0.1.0-rc.5'
-    '@deepseek-ai/dsh-tools': '>=0.1.0-rc.5'
-    '@deepseek-ai/dsh-system-prompt': '>=0.1.0-rc.5'
-    '@deepseek-ai/dsh-client-runtime': '>=0.1.0-rc.5'
-    '@deepseek-ai/dsh-client-ui-workspace': '>=0.1.0-rc.5'
 
 # pnpm 10+ blocks any dependency shipping an install/build script until it is
 # explicitly reviewed here (strictDepBuilds defaults to true: an unlisted script
@@ -78,22 +68,5 @@ minimumReleaseAgeExclude:
   - node-addon-require-builtin-win32-x64-msvc@0.1.4
   - node-addon-require-builtin@0.1.4
 
-# 交叉构建（Linux 构建机出 Windows 安装包）：让 pnpm 除当前平台外，
-# 同时安装 win32-x64 平台二进制。pnpm deploy 走 hoisted 布局时这些平台包会
-# 平铺进 node_modules（@koromix/koffi-win32-x64、@img/sharp-win32-x64、
-# node-addon-require-builtin-win32-x64-msvc 等），随 dsh-runtime.7z 发布到
-# Windows 后即可加载；否则 deploy 只装宿主（Linux）版原生模块，Windows 上
-# 启动必崩（session-persistence-jsonl / fs-local 无条件 import koffi）。
-supportedArchitectures:
-  os:
-    - current
-    - win32
-  cpu:
-    - current
-    - x64
-  libc:
-    - current
-    - msvc
-
 patchedDependencies:
-  node-pty@1.1.0: patches/node-pty@1.1.0.patch
+  node-pty@1.2.0-beta.15: patches/node-pty@1.2.0-beta.15.patch

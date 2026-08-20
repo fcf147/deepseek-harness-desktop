@@ -1,10 +1,10 @@
 # DeepSeek Harness — 桌面化定制工程（单仓库）
 
-> **仅官方 harness + 桌面壳**：本仓库已在 `yuanbanjiake` 分支移除全部非官方定制——6 个第三方插件（`dsh-remote`、`dshmarket`、`dsh-message-edit`、`@dsh-external/dsh-vision-toolkit`、`dsh-memory-evolve`、`dsh-wsl-workspace`）、`dsh-mcp-client` 桥接、自定义 `summer-craft` 预设及其 `dsh-code-review`/`dsh-doc-standards` 两个 skill、以及 `repo/vendor/dsh-memory-evolve` 离线快照均已删除。当前仓库仅保留 **官方 [`deepseek-harness`](https://github.com/deepseek-ai/deepseek-harness) 基线 + 桌面壳（`desktop/` Electron + `harmony/` 鸿蒙）+ 官方默认会话基础设施**。
+> **仅官方 harness + 桌面壳**：本仓库在 `yuanbanjiake` 分支移除全部非官方定制——6 个第三方插件（`dsh-remote`、`dshmarket`、`dsh-message-edit`、`@dsh-external/dsh-vision-toolkit`、`dsh-memory-evolve`、`dsh-wsl-workspace`）、自定义 `summer-craft` 预设及其 `dsh-code-review`/`dsh-doc-standards` 两个 skill、以及 `repo/vendor/dsh-memory-evolve` 离线快照均已删除。当前仓库仅保留 **官方 [`deepseek-harness`](https://github.com/deepseek-ai/deepseek-harness) 基线（含官方 `@deepseek-ai/dsh-mcp-client`）+ 桌面壳（`desktop/` Electron + `harmony/` 鸿蒙）+ 官方默认会话基础设施**。
 
-> **版本基线说明**：本仓库基于官方 [`deepseek-harness`](https://github.com/deepseek-ai/deepseek-harness) 的 **`0.1.0-rc.5` 完整源码快照**（`repo/deepseek-harness-master/`）定制。npm 上最新已发布 `0.1.0-rc.6`，但 **rc.6 为 CLI 聚合包（编译产物），不是完整 monorepo 源码树**，且其与 rc.5 源码树存在差异（provider 适配、cordis patch 兼容层有改动），补丁无法直接迁移。因此本仓库**有意锁定 rc.5 基线**以保证构建可复现；升级路径见「升级官方基线」章节。
+> **版本基线说明**：本仓库基于官方 [`deepseek-harness`](https://github.com/deepseek-ai/deepseek-harness) 的 **`0.1.0-rc.8` 完整源码快照**（`repo/deepseek-harness-master/`）定制。rc.8 为官方发布的最新 tag，含完整 monorepo 源码树；官方依赖闭包与 peer 范围均已自洽，无需对 `repo/deepseek-harness-master/` 打任何补丁。升级路径见「升级官方基线」章节。
 
-基于官方 [`deepseek-harness`](https://github.com/deepseek-ai/deepseek-harness)（基线 `0.1.0-rc.5`）的定制仓库，核心工作只有一项：
+基于官方 [`deepseek-harness`](https://github.com/deepseek-ai/deepseek-harness)（基线 `0.1.0-rc.8`）的定制仓库，核心工作只有一项：
 
 1. **桌面化**：`desktop/`（Electron 壳，用户免装 Node.js）+ `harmony/`（鸿蒙 ArkWeb 客户端），把官方 harness 打包成开箱即用的桌面应用。
 
@@ -18,7 +18,7 @@
 ```
 .
 ├── repo/deepseek-harness-master/   # 官方仓库（已应用补丁，含 lib 编译产物）
-│   └── patches/desktop-runtime.patch # 补丁集（也可在 release/ 独立查看）
+│   └── patches/desktop-runtime.patch # 历史补丁空壳（rc.8 基线无需对官方源码打补丁）
 ├── desktop/                        # 桌面壳工程（Electron + 内置 Node/dsh 运行时）
 │   ├── main.js                     # Electron 主进程
 │   ├── scripts/
@@ -108,14 +108,9 @@ Get-FileHash '.\dsh-runtime.7z' -Algorithm SHA256
 
 ## 对官方仓库的修改
 
-全部修改集中在补丁集 [`desktop-runtime.patch`](release/deepseek-harness-desktop/patches/desktop-runtime.patch)（仅 `apps/cli/package.json` 一项：补充官方 `@deepseek-ai/*` 依赖闭包，使桌面版 `pnpm deploy` 可正常解析；其余官方依赖与 peer 放宽已在 `pnpm-workspace.yaml` 中保留），摘要如下：
+本仓库**不修改官方 harness 源码**。`repo/deepseek-harness-master/` 即官方 `deepseek-harness` `0.1.0-rc.8` 的完整源码快照——官方依赖闭包与 peer 范围均已自洽，桌面版 `pnpm deploy` 可直接解析，无需任何补丁。所有桌面化工作都发生在 `repo/` 之外的 `desktop/`（Electron 壳）、`harmony/`（鸿蒙客户端）与本仓库根脚本（`scripts/setup.mjs`）中。
 
-| 文件 | 改动 | 目的 |
-|---|---|---|
-| `apps/cli/package.json` | 补充 19 个 `@deepseek-ai/*` workspace 依赖 | 桌面版 `pnpm deploy` 只装生产依赖，官方包「模块回退目录」需要完整依赖闭包，否则 hoisted 布局下运行时 `Cannot find package` |
-| `pnpm-workspace.yaml` | 放宽 6 个 `@deepseek-ai/*` peer 范围（rc.6 → rc.5） | 让官方依赖在 rc.5 基线下可安装 |
-
-逐条「为什么」与可审计细节见 [`release/deepseek-harness-desktop/patches/README.md`](release/deepseek-harness-desktop/patches/README.md) 与 `desktop/README.md`。
+> 早期版本曾对官方源码打补丁（19 个 `@deepseek-ai/*` 依赖闭包 + peer 范围放宽）以适配 rc.5；升级到 rc.8 后这些补丁已不再需要，`release/deepseek-harness-desktop/patches/` 仅保留空壳以备追溯。
 
 ## 说明
 
@@ -126,13 +121,10 @@ Get-FileHash '.\dsh-runtime.7z' -Algorithm SHA256
 
 ## 升级官方基线
 
-本仓库锁定官方 `0.1.0-rc.5` 源码快照（理由见开头「版本基线说明」）。升级到更新的官方版本（如 npm 已发布的 `0.1.0-rc.6` 对应的源码树）按以下步骤：
+本仓库直接跟踪官方 `deepseek-harness` 的发布 tag；`repo/deepseek-harness-master/` 就是官方源码快照。升级到更新的官方版本（如后续发布的 `dsh-v0.1.0-rc.9`）按以下步骤：
 
-1. **获取官方源码树**：`git clone https://github.com/deepseek-ai/deepseek-harness.git`（或从能访问 GitHub 的机器拉取），checkout 目标版本（rc.6 需官方 master/对应 tag 的**完整源码**，npm tarball 只是 CLI 聚合包，不能作为基线）。
-2. **重建基线快照**：替换 `repo/deepseek-harness-master/` 为新的官方源码树，重新 `pnpm install && pnpm run build`。
-3. **迁移补丁**：`desktop-runtime.patch` 基于 rc.5 上下文，rc.6 改动过 provider 适配与 cordis patch 兼容层，直接 `git apply` 大概率冲突。用 `git apply --reject` 逐块合并（`release/deepseek-harness-desktop/patches/README.md` 有说明），重点核对：
-   - `apps/cli/package.json` 的 19 个 workspace 依赖补充（rc.6 若已补齐可移除）
-   - `pnpm-workspace.yaml` 的 peer 范围放宽（rc.6 原生支持时删除）
-4. **重新构建桌面版**：`node scripts/setup.mjs && cd desktop && npm run build:win`。
+1. **获取官方源码树**：`git clone https://github.com/deepseek-ai/deepseek-harness.git`，checkout 目标 tag（需**完整源码树**，不是 npm CLI 聚合 tarball）。
+2. **替换基线快照**：将 `repo/deepseek-harness-master/` 整个目录替换为官方源码树（我们自己的非 harness 文件不在此目录内，不受影响）。官方源码自洽，无需迁移补丁。
+3. **重新构建桌面版**：`node scripts/setup.mjs && cd desktop && npm run build:win`（或对应平台）。
 
-> 升级基线是独立工程，建议在可访问 GitHub 的环境进行；本仓库保持 rc.5 是为了当前离线环境下的可复现构建。
+> 升级基线是独立工程，建议在可访问 GitHub 的环境进行。
