@@ -22,34 +22,33 @@
 desktop/
   main.js                  Electron 主进程（解析 Node 来源、拉起 dsh web、解析 URL、管理窗口/托盘）
   electron-builder.yml     打包配置（win nsis + linux rpm）
-  installer.nsh            NSIS 自定义安装脚本（检测系统 Node + 解压 dsh-runtime.7z 归档）
+  installer.nsh            NSIS 自定义安装脚本（检测系统 Node，静默补齐兜底）
   assets/icon.png          应用图标
-  tools/7za.exe            随包分发的 7-Zip 解压工具（安装器解压归档用，构建时自动复制）
   scripts/
     prepare-runtime.mjs    组装 runtime：内置 Node（动态解析最新合规 LTS + 交叉 pnpm shim）
                           + pnpm deploy dsh + profile 模板；linux 目标不内置 Node
-    build.mjs              一键构建入口（prepare-runtime -> electron-builder -> 归档）
+    build.mjs              一键构建入口（prepare-runtime -> electron-builder）
   runtime/                 构建产物（不入库）
     node/<platform>-<arch>/  内置免安装 Node.js（仅 Windows 等内置；linux 不生成）
     dsh/                    dsh 安装根（node_modules 闭包，官方 harness 生产依赖）
     templates/profiles/web/  profile 骨架
   dist/                    发布产物输出
-    DeepSeek Harness-<ver>-win-setup.exe   Windows 安装包（含内置 Node，不含 dsh 运行时）
-    dsh-runtime.7z          dsh 运行时归档（安装时解压到 resources/runtime）
+    DeepSeek Harness-<ver>-win-setup.exe   Windows 安装包（单文件：Electron + 内置 Node + dsh）
+    DeepSeek Harness-<ver>-linux-x64.rpm   Linux rpm（内置 dsh，不含 Node）
 ```
 
-## 发布方式（Windows：Node 随包 + dsh 拆分发）
+## 发布方式（单文件安装包）
 
-- `DeepSeek Harness-<version>-win-setup.exe`：含 Electron 壳 + 应用代码 + profile 模板 + 7za 工具 + **内置 Node.js**（extraResources，安装时静默落盘到 `resources/runtime/node/`）；
-- `dsh-runtime.7z`：体积大头 dsh 运行时（~340MB，压缩后实际约 50MB），**不含 Node**。
+- `DeepSeek Harness-<version>-win-setup.exe`：**单文件交付**，自包含 Electron 壳 + 应用代码 + profile 模板 + **内置 Node.js**（extraResources）+ **dsh 安装根**（extraResources），一个 exe 装完即用，无 dsh-runtime.7z 拆分。
+- `DeepSeek Harness-<version>-linux-x64.rpm`：内置 dsh（不含 Node，使用系统 Node.js）。
 
-**安装时**：两个文件需放在同一目录；安装程序（`installer.nsh` 的 `customInstall`）先检测系统 Node.js（PATH 中 `node --version` 满足 `^22.19.0 || >=24.0.0` 时写 `.use-system-node` 标记复用系统 Node；否则直接使用包内内置 Node，即"后台静默补齐"），再用内置 7za 把归档解压到 `$INSTDIR\resources\runtime\`。归档缺失时安装会中止并提示。main.js 启动时会做严格版本校验，系统 Node 不满足要求时自动回退内置 Node。
+**安装时**：安装程序（`installer.nsh` 的 `customInstall`）检测系统 Node.js——PATH 中 `node --version` 满足 `^22.19.0 || >=24.0.0` 时写 `.use-system-node` 标记复用系统 Node；否则直接使用包内内置 Node（即"后台静默补齐"，离线零交互）。main.js 启动时做严格版本校验，系统 Node 不满足要求时自动回退内置 Node。
 
-**升级/换机器**：只需重新下载并安装 exe（运行时归档通用，`dsh-runtime.7z` 无需随版本变化除非升级了 dsh）。
+**升级/换机器**：只需重新下载并安装新 exe（安装包内含全部运行时）。
 
 ## 构建（从零到 exe，需要联网）
 
-构建机要求：Windows 或 Linux x64；Node.js 22+（或任意能跑 pnpm 的 Node）、pnpm ≥ 10、git。**Linux 构建机可直接交叉构建 Windows 安装包**（脚本已适配：pnpm 预置、归档 7za 均按宿主平台处理），**无需 wine**；交叉构建时还需 wine 供 electron-builder 的 rcedit 注入 exe 资源（不装可 `--config.win.signAndEditExecutable=false` 跳过，代价是 exe 无图标/版本信息）。`repo/pnpm-workspace.yaml` 已含 `supportedArchitectures`（win32），Linux 宿主 install 后 store 会带 win32 平台原生模块，否则 win32 产物在 Windows 上启动必崩。
+构建机要求：Windows 或 Linux x64；Node.js 22+（或任意能跑 pnpm 的 Node）、pnpm ≥ 10、git。**Linux 构建机可直接交叉构建 Windows 安装包**（脚本已适配：pnpm 预置按宿主平台处理）；交叉构建时需 wine 供 electron-builder 的 rcedit 注入 exe 图标/版本资源（不装可 `--config.win.signAndEditExecutable=false` 跳过，代价是 exe 无图标/版本信息）。`repo/pnpm-workspace.yaml` 已含 `supportedArchitectures`（win32），Linux 宿主 install 后 store 会带 win32 平台原生模块，否则 win32 产物在 Windows 上启动必崩。
 
 **前置：`../repo/deepseek-harness-master/` 必须先构建**（`pnpm install && pnpm run build`，产出 `apps/cli/lib/bin.js` 与 web dist）。`prepare-runtime` 的 `pnpm deploy` 依赖它，未构建会直接报「仓库尚未构建」。最省事的方式是先在仓库根目录跑 `node scripts/setup.mjs` 完成全部准备（repo 构建 + desktop 依赖 + runtime 组装），再执行本节命令。
 
@@ -75,11 +74,9 @@ npm run build:linux
 
 1. 组装内置 Node 运行时（**动态解析 nodejs.org 最新满足 engines `^22.19.0 || >=24.0.0` 的 LTS** 下载；`DSH_DESKTOP_NODE_VERSION` 指定固定版本，`NODE_MIRROR` 换镜像）。linux 目标不内置 Node。**已就绪自动跳过下载**（检测 `runtime/node/<platform>-<arch>/node.exe` 或 `bin/node`，离线可复用）。
 2. （Windows 交叉构建时）用宿主 npm 把 pnpm 包装进内置 Node 目录，生成 `pnpm.cmd` / `pnpm.ps1` shim（dsh 的插件命令从 PATH 解析 pnpm）。
-3. 在官方仓库内执行 `pnpm --filter @deepseek-ai/dsh deploy`，把 dsh 及其生产依赖组装为独立安装根（`runtime/dsh` 已就绪时跳过）。**前置：仓库已构建（步骤 0 的 `pnpm run build`）。**
+3. 在官方仓库内执行 `pnpm --filter @deepseek-ai/dsh deploy`，把 dsh 及其生产依赖组装为独立安装根（`runtime/dsh` 已就绪时跳过），并还原 vendored 包（cosmokit/schemastery/cordis-plugin-group）与补齐目标平台原生模块。**前置：仓库已构建（步骤 0 的 `pnpm run build`）。**
 4. 生成 web profile 模板。
-5. （Windows）复制 7zip-bin 的 win 版 7za.exe 到 `tools/7za.exe`，随包分发供安装器解压归档。
-6. 调用 electron-builder 打包（Windows NSIS / Linux rpm）。**nsis / nsis-resources / winCodeSign 工具链从 GitHub 下载**，被墙时构建在 NSIS 阶段失败，处理见下「网络与缓存」。
-7. （Windows）把 `runtime/dsh` 压缩为 `dist/dsh-runtime.7z` 归档（**Node 已作为 extraResources 打入安装包**，归档只含 dsh）——**归档 7za 按宿主平台自动选择**（Linux 构建机用 linux 版，无需 wine）。
+5. 调用 electron-builder 打包（Windows NSIS / Linux rpm，Node + dsh 均在 extraResources 里，单文件输出）。**nsis / nsis-resources / winCodeSign 工具链从 GitHub 下载**，被墙时构建在 NSIS 阶段失败，处理见下「网络与缓存」。
 
 ## 网络与缓存（离线 / 受限网络）
 

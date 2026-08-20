@@ -1,18 +1,17 @@
 // 一键构建：prepare-runtime -> electron-builder（win nsis / linux rpm）。
 // 用法: node scripts/build.mjs --platform win|linux [--arch x64|arm64]
 //
-// Windows（拆分发布 + Node 随包内置）：
-//   1) 把 7zip-bin 的 7za.exe 复制到 tools/（随包分发给安装器解压归档用）；
-//   2) prepare-runtime 动态解析最新合规 Node（engines ^22.19.0 || >=24.0.0）
-//      下载免安装包到 runtime/node/win32-x64，并 pnpm deploy dsh 安装根；
-//   3) electron-builder 打包 exe：Node（extraResources）与 dsh 分置——
-//      Node 直接打入安装包（安装期静默补齐/复用系统 Node 的兜底），
-//      dsh 运行时压缩成 dist/dsh-runtime.7z（~50MB）与安装包同目录发布，
-//      由安装器（installer.nsh）解压到 resources/runtime；
-// Linux rpm：不内置 Node，只随包分发 dsh + profile 模板（运行时检测系统 Node）。
+// 单文件发布：
+//   - Windows：NSIS 安装包自包含 Electron 壳 + 内置 Node（extraResources）+
+//     dsh 安装根（extraResources），无 dsh-runtime.7z 拆分，一个 exe 交付；
+//   - Linux rpm：不内置 Node，随包分发 dsh + profile 模板（运行时检测系统 Node）。
+//
+// prepare-runtime 职责：Windows 动态解析最新合规 Node（engines
+// ^22.19.0 || >=24.0.0）下载免安装包到 runtime/node/win32-x64，并 pnpm deploy
+// dsh 安装根 + 还原 vendored 包 + 补齐 win32 平台原生模块；linux 只 deploy dsh。
 
 import { spawnSync } from 'node:child_process'
-import { existsSync, statSync, copyFileSync, mkdirSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -60,34 +59,9 @@ const prepareArgs = [
 ]
 run(process.execPath, prepareArgs)
 
-// 1.5) Windows 拆分发布：确保 tools/7za.exe 随包分发（安装器用它解压归档）
-let sevenZip = null
-if (args.platform === 'win') {
-  const candidates = [
-    path.join(DESKTOP_ROOT, 'node_modules', '7zip-bin', 'win', 'x64', '7za.exe'),
-    path.join(DESKTOP_ROOT, 'node_modules', '7zip-bin', 'win', 'ia32', '7za.exe'),
-  ]
-  sevenZip = candidates.find(existsSync)
-  if (!sevenZip) {
-    console.error('未找到 7zip-bin 的 7za.exe（desktop/node_modules/7zip-bin）')
-    process.exit(1)
-  }
-  mkdirSync(path.join(DESKTOP_ROOT, 'tools'), { recursive: true })
-  copyFileSync(sevenZip, path.join(DESKTOP_ROOT, 'tools', '7za.exe'))
-  console.log(`7za 就位: tools/7za.exe (${sevenZip})`)
-}
-
-// 归档压缩选可执行 7za：tools/7za.exe 是 win 版（随包分发给安装器解压归档），
-// 在 Linux 构建机上不能直接执行（除非经 wine/binfmt）。压缩步骤改按宿主平台
-// 选 7zip-bin 的原生 7za（linux 版与 win 版同版本、产物格式一致），
-// win 构建机仍用 sevenZip（即 win 版）。
-const archiver7z = (args.platform === 'win' && process.platform !== 'win32')
-  ? [path.join(DESKTOP_ROOT, 'node_modules', '7zip-bin', 'linux', 'x64', '7za'),
-     path.join(DESKTOP_ROOT, 'node_modules', '7zip-bin', 'linux', 'ia32', '7za')].find(existsSync) || sevenZip
-  : sevenZip
-
 // 2) electron-builder（直接经 node 调其 CLI，绕开 npx.cmd 在含空格路径下的
-//    %~dp0 解析问题）
+//    %~dp0 解析问题）。Windows：Node + dsh 已全部在 extraResources 里，
+//    打进安装包，单文件交付；Linux：rpm 内置 dsh + 模板（不含 Node）。
 const ebCli = path.join(DESKTOP_ROOT, 'node_modules', 'electron-builder', 'cli.js')
 if (!existsSync(ebCli)) {
   console.error(`未找到 electron-builder: ${ebCli}`)
@@ -97,18 +71,4 @@ const target = args.platform === 'win' ? '--win' : '--linux'
 const archFlag = `--${args.arch === 'arm64' ? 'arm64' : 'x64'}`
 run(process.execPath, [ebCli, target, archFlag], { cwd: DESKTOP_ROOT })
 
-// 3) Windows 拆分发布：压缩 dsh 为 dsh-runtime.7z（与安装包同目录）。
-//    Node 已作为 extraResources 直接打入安装包，7z 只含 dsh 安装根。
-if (args.platform === 'win') {
-  const runtimeRoot = path.join(DESKTOP_ROOT, 'runtime')
-  const archive = path.join(DESKTOP_ROOT, 'dist', 'dsh-runtime.7z')
-  // 归档内保持 dsh/ 顶层结构，解压到 resources\runtime 后与 main.js
-  // 的路径约定一致。
-  run(archiver7z, ['a', '-t7z', '-mx=9', '-mmt=on', '-bso0', '-bsp0', archive, 'dsh'], {
-    cwd: runtimeRoot,
-  })
-  const stat = statSync(archive)
-  console.log(`dsh-runtime.7z 生成: ${(stat.size / 1024 / 1024).toFixed(1)} MB`)
-}
-
-console.log('\n构建完成。安装包与 dsh-runtime.7z 位于 dist/ 目录。')
+console.log('\n构建完成。单文件安装包位于 dist/ 目录。')

@@ -1,18 +1,14 @@
-; dsh-desktop NSIS 自定义安装逻辑（拆分发布 + Node 随包内置）。
+; dsh-desktop NSIS 自定义安装逻辑（单文件安装包 + Node 随包内置）。
 ;
-; 安装包内嵌 Electron 壳 + 模板 + 7za 工具 + 内置 Node（extraResources 自动落盘到
-; $INSTDIR\resources\runtime\node\win32-x64）；dsh 安装根在单独的
-; dsh-runtime.7z 归档里（与安装包同目录）。
+; 安装包自包含 Electron 壳 + profile 模板 + 内置 Node + dsh 安装根
+; （extraResources 自动落盘到 $INSTDIR\resources\runtime\{node,dsh,templates}），
+; 无需额外的 dsh-runtime.7z 归档。
 ;
 ; customInstall 在应用文件解压完成后执行（electron-builder installSection.nsh）：
-;   1) 检测系统 PATH 中的 Node.js：满足 dsh engines（^22.19.0 || >=24.0.0）时
-;      写 .use-system-node 标记，桌面壳优先复用系统 Node（main.js 会做严格版本
-;      校验，不满足时自动回退内置 Node）；不满足/未安装则静默使用内置 Node
-;      （安装包自带，即"后台静默补齐"，全程离线、无需交互）；
-;   2) 用内置 7za 把 dsh-runtime.7z 解压到 $INSTDIR\resources\runtime\。
-;      （先补齐 Node 依赖，再安装 harness 本体）
-;
-; 归档缺失时中止安装并给出明确提示（应用无法工作）。
+; 检测系统 PATH 中的 Node.js：满足 dsh engines（^22.19.0 || >=24.0.0）时
+; 写 .use-system-node 标记，桌面壳优先复用系统 Node（main.js 会做严格版本
+; 校验，不满足时自动回退内置 Node）；不满足/未安装则静默使用内置 Node
+; （安装包自带，即"后台静默补齐"，全程离线、无需交互）。
 
 ; ===== 升级路径：先静默卸载旧版本，再继续安装新版本 =====
 ; electron-builder 默认对已安装版本走「覆盖安装」；旧版产物若来自不同构建
@@ -82,7 +78,7 @@
 !macroend
 
 !macro customInstall
-  ; ===== 1) 检测系统 Node.js，决定复用系统 Node 或静默使用内置 Node =====
+  ; ===== 检测系统 Node.js，决定复用系统 Node 或静默使用内置 Node =====
   ; 内置 Node 已随安装包解压（extraResources），无需任何下载；
   ; 仅当系统 PATH 中存在满足 engines（^22.19.0 || >=24.0.0）的 Node 时写
   ; .use-system-node 标记让桌面壳优先复用（宽松启发式：v22.*/v24.*/v25.*/v26.*，
@@ -104,20 +100,5 @@
     ${EndIf}
   ${Else}
     DetailPrint "未检测到系统 Node.js，静默使用内置 Node（后台补齐依赖）。"
-  ${EndIf}
-
-  ; ===== 2) 解压 dsh 运行时（Node 依赖就绪后再装 harness 本体） =====
-  ${If} ${FileExists} "$EXEDIR\dsh-runtime.7z"
-    DetailPrint "正在解压 dsh 运行时 (dsh-runtime.7z) ..."
-    nsExec::ExecToStack '"$INSTDIR\resources\tools\7za.exe" x "$EXEDIR\dsh-runtime.7z" -y -o"$INSTDIR\resources\runtime"'
-    Pop $0
-    ${If} $0 != 0
-      MessageBox MB_OK|MB_ICONSTOP "dsh 运行时解压失败 (exit $0)。请确认 dsh-runtime.7z 与安装包放在同一目录。"
-      Quit
-    ${EndIf}
-    DetailPrint "dsh 运行时解压完成。"
-  ${Else}
-    MessageBox MB_OK|MB_ICONSTOP "未找到 dsh-runtime.7z（应与安装包放在同一目录）。安装中止。"
-    Quit
   ${EndIf}
 !macroend

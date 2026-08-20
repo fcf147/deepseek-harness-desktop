@@ -32,21 +32,20 @@ DeepSeek Harness 的桌面发行版：Electron 壳 + 预组装 `dsh` 安装根�
 
 ## 快速开始（使用安装包）
 
-Windows 为**拆分发布**，需要同时下载两个文件并放在同一目录：
+**单文件安装包**，下载后直接运行：
 
-1. 下载 `DeepSeek Harness-<version>-win-setup.exe`（Electron 壳 + 应用代码 + profile 模板 + **内置 Node.js**）。
-2. 下载 `dsh-runtime.7z`（dsh 运行时归档，~50MB，**不含 Node**），与安装包放在同一目录。
-3. 运行安装包：安装程序先检测系统 Node.js——PATH 中 `node --version` 满足 `^22.19.0 || >=24.0.0` 时写 `.use-system-node` 标记复用系统 Node，否则静默使用包内内置 Node（后台补齐，离线零交互）；随后用内置 7za 把归档解压到安装目录的 `resources\runtime\`；归档缺失时会中止并提示。
-4. 启动应用，首次运行会初始化用户数据目录（Windows：`%APPDATA%\dsh-desktop\home`，Linux：`~/.config/dsh-desktop/home`）并启动 `dsh web` 服务；桌面版使用独立数据目录，不与已有 CLI 的 `~/.dsh` 互相干扰。
-5. 在工作区选择器中选择本地工作区。
-6. 如需在 HarmonyOS 设备上使用，安装 `harmony/` 客户端并填入桌面端显示的 `dsh web:` 地址。
+1. 下载 `DeepSeek Harness-<version>-win-setup.exe`（自包含 Electron 壳 + 应用代码 + profile 模板 + **内置 Node.js** + **dsh 安装根**，一个 exe 装完即用，无 dsh-runtime.7z 拆分）。
+2. 运行安装包：安装程序检测系统 Node.js——PATH 中 `node --version` 满足 `^22.19.0 || >=24.0.0` 时写 `.use-system-node` 标记复用系统 Node，否则静默使用包内内置 Node（后台补齐，离线零交互）。
+3. 启动应用，首次运行会初始化用户数据目录（Windows：`%APPDATA%\dsh-desktop\home`，Linux：`~/.config/dsh-desktop/home`）并启动 `dsh web` 服务；桌面版使用独立数据目录，不与已有 CLI 的 `~/.dsh` 互相干扰。
+4. 在工作区选择器中选择本地工作区。
+5. 如需在 HarmonyOS 设备上使用，安装 `harmony/` 客户端并填入桌面端显示的 `dsh web:` 地址。
 
-> 升级应用版本时只需重新安装新的 exe，`dsh-runtime.7z` 通用（除非 dsh 运行时本身升级）。Windows 内置 Node 版本随 nodejs.org 最新合规 LTS 动态更新，安装包因此需要随版本一起重新发布。
+> 升级应用版本时只需重新下载并安装新 exe（安装包内含全部运行时）。Windows 内置 Node 版本随 nodejs.org 最新合规 LTS 动态更新，安装包因此需要随版本一起重新发布。
 
 ## 从源码构建（从零到 exe）
 
 > 以下步骤在一台**干净的 Windows 或 Linux x64 机器**上从零开始，最终产出可安装的
-> Windows 安装包（`*-win-setup.exe` + `dsh-runtime.7z`）。
+> Windows 安装包（`*-win-setup.exe`，单文件）。
 
 ### 0. 前置条件（仅构建机需要）
 
@@ -110,21 +109,21 @@ npm install
 ### 5. 一键构建
 
 ```bash
-# Windows：产出安装包 + 运行时归档（推荐在 Windows 上执行）
+# Windows：产出单文件安装包（推荐在 Windows 上执行；Linux 交叉构建需 wine）
 npm run build:win
 
-# Linux rpm（可选，全量打包无拆分）：在 Linux 上执行
+# Linux rpm（可选）：在 Linux 上执行
 npm run build:linux
 ```
 
-`build.mjs` 会自动完成：组装 runtime（Windows：动态解析最新合规 Node LTS → `pnpm deploy` dsh 安装根 → profile 模板；Linux：不内置 Node，只 deploy dsh + 模板）→ electron-builder 打包 → 压缩 `dsh-runtime.7z`（仅 dsh）。
+`build.mjs` 会自动完成：组装 runtime（Windows：动态解析最新合规 Node LTS → `pnpm deploy` dsh 安装根 + 还原 vendored 包 + 补齐 win32 原生模块 → profile 模板；Linux：不内置 Node，只 deploy dsh + 模板）→ electron-builder 打包（Node + dsh 均随包内置，单文件输出）。
 
 ### 6. 产物
 
-位于 `dist/`：
+位于 `dist/`（均为**单文件**，无需配套归档）：
 
-- Windows：`dist/DeepSeek Harness-<version>-win-setup.exe`（含内置 Node）+ `dist/dsh-runtime.7z`（~50MB，仅 dsh）——**两个文件需同目录发布/安装**
-- Linux：`dist/DeepSeek Harness-<version>-linux-x64.rpm`（**不含 Node**，依赖系统 Node.js）
+- Windows：`dist/DeepSeek Harness-<version>-win-setup.exe`（自包含 Electron + 内置 Node + dsh 安装根）
+- Linux：`dist/DeepSeek Harness-<version>-linux-x64.rpm`（内置 dsh，**不含 Node**，依赖系统 Node.js）
 
 ### 网络镜像（可选，国内构建机推荐）
 
@@ -143,9 +142,9 @@ export ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-b
 - Windows 目标：`runtime/node/win32-x64` 已就绪时自动跳过下载（日志显示「Node 运行时已存在」）；也可用 `DSH_DESKTOP_NODE_VERSION` 固定版本。
 - 已组装的 `runtime/` 与已构建的 `desktop/node_modules` 均幂等跳过（见 `prepare-runtime.mjs` 的 `isDshReady`）。
 
-### 拆分发布说明（Windows）
+### 单文件发布说明
 
-`build.mjs` 在 electron-builder 打包后，用 7za（`desktop/node_modules/7zip-bin`）把 `runtime/dsh` 压缩为 `dist/dsh-runtime.7z`；`electron-builder.yml` 的 win `extraResources` 除 `runtime/templates` 与 `tools/7za.exe` 外，**额外打入 `runtime/node/win32-x64`（内置 Node 随安装包分发）**。安装时由 `installer.nsh` 的 `customInstall` 宏：先检测系统 Node.js（满足 `^22.19.0 || >=24.0.0` 则写 `.use-system-node` 标记复用，否则静默使用内置 Node），再把归档解压到 `$INSTDIR\resources\runtime\`；main.js 启动时做严格版本校验，系统 Node 不满足要求时自动回退内置 Node。
+`electron-builder.yml` 的 win `extraResources` 把 `runtime/templates`、`runtime/node/win32-x64`（内置 Node）与 `runtime/dsh`（dsh 安装根）全部打入安装包，**单文件交付**（无 dsh-runtime.7z 拆分）。安装时由 `installer.nsh` 的 `customInstall` 宏检测系统 Node.js（满足 `^22.19.0 || >=24.0.0` 则写 `.use-system-node` 标记复用，否则静默使用内置 Node）；main.js 启动时做严格版本校验，系统 Node 不满足要求时自动回退内置 Node。
 
 ## 运行时装配说明
 
