@@ -307,15 +307,17 @@ async function deployDsh(args) {
   ]
   // 交叉构建（如 Linux 宿主构建 win32 目标）：平台分包的 optionalDependencies
   // （koffi 3.x 的 @koromix/koffi-<platform>、sharp 的 @img/sharp-<platform>、
-  // node-addon-require-builtin-<platform> 等）由 repo/pnpm-workspace.yaml 的
-  // supportedArchitectures（os: [current, win32] 等）决定：pnpm 除宿主平台外
-  // 同时安装并平铺 win32-x64 平台二进制；否则 deploy 只装 Linux 版原生模块，
-  // 装到 Windows 上启动必崩（session-persistence-jsonl / fs-local 无条件 import
-  // koffi）。注：node-gyp 现场编译的包（cpu-features、ssh2 的 sshcrypto）仍会
+  // node-addon-require-builtin-<platform> 等）按宿主平台解析。注意：官方 rc.8
+  // 基线未在 repo/pnpm-workspace.yaml 配置 supportedArchitectures，因此 Linux
+  // 宿主上 deploy 只装 Linux 版原生模块，产物不适用于 Windows；若需在 Linux 上
+  // 交叉构建 win32，须先在 repo/pnpm-workspace.yaml 追加 supportedArchitectures
+  // （os: [current, win32]）并重新 pnpm install，使 store 含有 win32-x64 平台包。
+  // 正式 Windows 安装包应在 Windows 构建机执行（pnpm 原生解析 win32 平台包）。
+  // 注：node-gyp 现场编译的包（cpu-features、ssh2 的 sshcrypto）仍会
   // 编出宿主版本，但它们是可选加速，缺失时运行库自动降级（ssh2 走纯 JS），
   // 可接受。
   if (args.platform !== process.platform) {
-    log(`交叉构建 ${args.platform}：supportedArchitectures 已同时平铺 Windows 平台原生模块`)
+    log(`交叉构建 ${args.platform}：注意 rc.8 官方基线未配置 supportedArchitectures，产物可能缺少目标平台原生模块`)
   }
   deployArgs.push(dest)
   // 子 postinstall（cpu-features、dsh-subprocess-local 的 ensure-spawn-helper）
@@ -568,8 +570,8 @@ function dshCliPath(dest) {
 function writeProfileTemplate() {
   const dir = path.join(RUNTIME_ROOT, 'templates', 'profiles', 'web')
   mkdirSync(dir, { recursive: true })
-  // 与官方 PROFILE_TEMPLATES.web 一致：base + web-app（web-app bundle 已默认
-  // 启用 5 个第三方插件，开箱即用）。
+  // 与官方 PROFILE_TEMPLATES.web 一致：base + web-app（rc.8 基线 web-app
+  // bundle 仅含官方 @deepseek-ai/* 插件，开箱即用）。
   writeFileSync(path.join(dir, 'package.json'), JSON.stringify({
     name: 'dsh-profile-web',
     private: true,

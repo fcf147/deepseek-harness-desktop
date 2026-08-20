@@ -8,7 +8,7 @@
  * 自动完成：
  *   1. 环境检查（node / pnpm / git）
  *   2. 官方仓库（repo/deepseek-harness-master）：pnpm install + pnpm run build
- *      （仓库已应用桌面版补丁，clone 即含；lib/ 产物已随仓库提供，
+ *      （rc.8 基线为官方源码原样快照，无需补丁；构建产物由本步骤生成，
  *       若需要重新构建或源码改动后重建，本步骤会幂等执行）
  *   3. 桌面壳（desktop/）：npm install + prepare-runtime（组装内置 Node + dsh 安装根 + profile 模板）
  *
