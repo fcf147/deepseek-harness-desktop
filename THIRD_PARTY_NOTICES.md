@@ -33,21 +33,13 @@
 - 版本：`11.7.0`（`repo/deepseek-harness-master/package.json` 的 `packageManager` 字段）
 - 许可证：MIT
 - 版权：Copyright (c) Zoltan Kochan and pnpm contributors
-- 用途：workspace 依赖安装、`pnpm deploy` 组装 dsh 运行时、插件市场（dshmarket）安装插件的底层包管理器
+- 用途：workspace 依赖安装、`pnpm deploy` 组装 dsh 运行时
 
 ## 其他运行时组件
 
 本项目随包分发或引用的其他第三方软件（各为 MIT 或其他相应许可证）：
 
 - **Node.js**（内置免安装运行时）：https://nodejs.org，版本 `v22.19.0`
-- **dsh-remote**（SSH 远程开发插件）：npm，MIT
-- **dshmarket**（插件市场插件）：npm，MIT
-- **dsh-message-edit**（消息编辑插件）：npm，MIT
-- **@dsh-external/dsh-vision-toolkit**（视觉工具插件）：npm，MIT
-- **dsh-memory-evolve**（跨会话记忆插件）：https://github.com/dsh-external/dsh-memory-evolve，MIT，钉在提交 `1aca4c49f23116e05f9ee645265bcdcf7e50d9a0`
 - **7-Zip**（7za.exe，Windows 安装器解压归档用）：https://www.7-zip.org，LGPL-2.1-or-later 与 unRAR restriction（7-Zip 官方许可）
-- **@modelcontextprotocol/sdk**（MCP client 桥接底层 SDK）：https://github.com/modelcontextprotocol/typescript-sdk，MIT
-- **@modelcontextprotocol/server-filesystem**（演示 MCP：文件系统访问）：https://github.com/modelcontextprotocol/servers，MIT
-- **@modelcontextprotocol/server-sqlite**（演示 MCP：SQLite 查询）：https://github.com/modelcontextprotocol/servers，MIT
 
 > 完整依赖清单与各包许可证见各发布产物的 lockfile（`pnpm-lock.yaml`、`desktop/package-lock.json`）及组件自带 LICENSE 文件。

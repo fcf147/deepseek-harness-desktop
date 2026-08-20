@@ -12,9 +12,7 @@
  *     templates/profiles/web/          web profile 骨架（复制到用户数据目录）
  *
  * dsh 安装根用 pnpm deploy 从官方仓库组装：它会把 @deepseek-ai/dsh 及其
- * 生产依赖（包括我们默认启用的 5 个第三方插件：dsh-remote、dshmarket、
- * dsh-message-edit、@dsh-external/dsh-vision-toolkit、dsh-memory-evolve，
- * 以及 ssh2）扁平化为一个可独立运行的 node_modules，无需用户安装全局 Node.js。
+ * 生产依赖扁平化为一个可独立运行的 node_modules，无需用户安装全局 Node.js。
  *
  * 前置条件（仅构建机需要）：
  *   - 官方仓库已 `pnpm install && pnpm run build`（构建机需要 Node 22+ 与 pnpm）
@@ -187,7 +185,7 @@ async function provisionNode(args) {
  *   win32-x64/pnpm.cmd   （Windows：node.exe 同目录）
  *   linux-x64/bin/pnpm   （Linux：bin/ 下与 node 同目录）
  *
- * 桌面版插件市场（dshmarket）与 `dsh plugin` 命令都从 PATH 解析 pnpm；Electron
+ * 桌面版 `dsh plugin` 命令都从 PATH 解析 pnpm；Electron
  * 壳启动 dsh 时会把该目录加入 PATH（见 desktop/main.js startServer）。用内置
  * node 自带的 npm 安装，避免依赖构建机全局 npm/pnpm，也无需额外下载平台二进制；
  * 运行时零写入（runtime 目录位于安装位置下，对普通用户可能不可写——运行期
@@ -304,9 +302,7 @@ async function deployDsh(args) {
     '--config.node-linker=hoisted',
     '--config.auto-install-peers=false',
     '--config.link-workspace-packages=true',
-    // web-app bundle 默认启用 dsh-memory-evolve，它以 git 依赖钉在固定提交
-    // （仅发布在 GitHub，未上 npm）。deploy 的默认 blockExoticSubdeps 会拒绝
-    // 子依赖中的 git 包，此处显式放行。
+    // 放行子依赖中的 exotic（git/非 registry）依赖，避免 deploy 拒绝非常规来源的子依赖。
     '--config.blockExoticSubdeps=false',
   ]
   // 交叉构建（如 Linux 宿主构建 win32 目标）：平台分包的 optionalDependencies

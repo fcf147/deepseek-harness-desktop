@@ -1,8 +1,7 @@
 // dsh-desktop Electron 主进程。
 //
 // 职责：定位随包附带的 runtime（内置 Node.js + dsh 完整安装），以
-// `--profile web --port 0` 拉起 dsh web 服务（web profile 的 bundle 层已默认
-// 启用 SSH 远程开发 dsh-remote），解析其打印的 URL 行，再把 BrowserWindow
+// `--profile web --port 0` 拉起 dsh web 服务，解析其打印的 URL 行，再把 BrowserWindow
 // 指向该 URL。退出时向子进程发 SIGTERM 并等待其退出，避免孤儿 node 进程
 // 占用端口/会话锁。
 //

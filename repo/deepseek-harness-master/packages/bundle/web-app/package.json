@@ -102,14 +102,7 @@
     "@deepseek-ai/dsh-storage-json": "workspace:^",
     "@deepseek-ai/dsh-workspace": "workspace:^",
     "@deepseek-ai/schemastery": "workspace:^",
-    "commander": "^15.0.0",
-    "dsh-remote": "^0.5.4",
-    "@dsh-external/dsh-vision-toolkit": "^0.1.4",
-    "dsh-memory-evolve": "github:dsh-external/dsh-memory-evolve#1aca4c49f23116e05f9ee645265bcdcf7e50d9a0",
-    "dsh-message-edit": "^0.2.2",
-    "dshmarket": "^1.9.0",
-    "@deepseek-ai/dsh-mcp-client": "workspace:^",
-    "dsh-wsl-workspace": "^0.2.3"
+    "commander": "^15.0.0"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis-plugin-loader": "workspace:^",

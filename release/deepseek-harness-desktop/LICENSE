@@ -23,5 +23,5 @@ SOFTWARE.
 ---
 
 Note: this license covers the desktop shell source code in this repository.
-The bundled runtime (Node.js, dsh) and the third-party `dsh-remote` plugin are
-distributed under their respective licenses.
+The bundled runtime (Node.js, dsh) is
+distributed under the upstream DeepSeek Harness license.

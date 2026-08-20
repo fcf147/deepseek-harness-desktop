@@ -9,8 +9,7 @@
 ## 特性
 
 - **内置 Node.js 运行时与完整 dsh 安装**：安装后直接双击/菜单启动，**用户无需安装 Node.js**（Node 运行时随包附带，位于 `resources/runtime/node/`）。
-- **默认启用 SSH 远程开发**：web profile 的 bundle 层已默认挂载 `dsh-remote` 插件（Settings → 远程工作区 添加机器；工作区选择器含 远程 tab；模型侧提供 `rw_*` 工具）。这是对官方仓库默认配置的修改（见 `repo/deepseek-harness-master` 中 `packages/bundle/web-app/cordis.patch.yml` 与 `package.json`、根 `pnpm-workspace.yaml` 的 peer 放行）。
-- **默认启用 WSL 工作区**：`dsh-wsl-workspace` 插件（侧边栏底部 Settings 旁的 **W 按钮**）——从 Web GUI 添加 WSL 发行版工作区，bash 与文件工具直接在 WSL 内运行（VS Code Remote-WSL 风格），无需在 WSL 里安装 sshd/工具链。
+- **纯官方 harness**：本分支（`yuanbanjiake`）已移除全部第三方 / 自定义插件（含 `dsh-remote`、`dsh-wsl-workspace` 等），桌面壳只打包官方 `deepseek-harness` 基线与其官方默认能力（standard / minimal 会话档位、官方会话基础设施）。
 - **完整 Web UI**：官方 dsh web 界面原样呈现，全部功能可用。
 - **独立用户数据**：DSH_HOME 指向 `%APPDATA%/dsh-desktop/home`（Windows）或 `~/.config/dsh-desktop/home`（Linux），与命令行 `~/.dsh` 互不干扰。
 - 系统托盘驻留、退出时有序停服（SIGTERM → 超时强杀，避免孤儿进程）。
@@ -29,7 +28,7 @@ desktop/
     build.mjs              一键构建入口（prepare-runtime -> electron-builder -> 归档）
   runtime/                 构建产物（不入库）
     node/<platform>-<arch>/  内置免安装 Node.js
-    dsh/                    dsh 安装根（node_modules 闭包，含 dsh-remote/ssh2）
+    dsh/                    dsh 安装根（node_modules 闭包，官方 harness 生产依赖）
     templates/profiles/web/  profile 骨架
   dist/                    发布产物输出
     DeepSeek Harness-<ver>-win-setup.exe   Windows 安装包（< 100MB，不含运行时）
@@ -54,10 +53,10 @@ desktop/
 **前置：`../repo/deepseek-harness-master/` 必须先构建**（`pnpm install && pnpm run build`，产出 `apps/cli/lib/bin.js` 与 web dist）。`prepare-runtime` 的 `pnpm deploy` 依赖它，未构建会直接报「仓库尚未构建」。最省事的方式是先在仓库根目录跑 `node scripts/setup.mjs` 完成全部准备（repo 构建 + desktop 依赖 + runtime 组装），再执行本节命令。
 
 ```sh
-# 0) 构建官方仓库源码树。本仓库已预置 repo/deepseek-harness-master/（含补丁与
-#    dsh-memory-evolve 离线快照，无需再从 GitHub 克隆/apply）：
+# 0) 构建官方仓库源码树。本仓库已预置 repo/deepseek-harness-master/（含补丁，
+#    直接 pnpm build 即可，无需再从 GitHub 克隆/apply）：
 cd repo/deepseek-harness-master
-pnpm install          # 首次或依赖变更后；GitHub 不可达时先跑 scripts/setup.mjs 建本地镜像
+pnpm install          # 首次或依赖变更后
 pnpm run build        # 必须：产出 apps/cli/lib/bin.js 与 web dist（deploy 的前置）
 cd ../..
 
@@ -74,8 +73,8 @@ npm run build:linux
 产物在 `desktop/dist/`。构建脚本会自动：
 
 1. 组装内置 Node 运行时（`DSH_DESKTOP_NODE_VERSION` 指定版本，默认 `v22.19.0`；`NODE_MIRROR` 换镜像）。**已就绪自动跳过下载**（检测 `runtime/node/<platform>-<arch>/node.exe` 或 `bin/node`，离线可复用）。
-2. （Windows 交叉构建时）用宿主 npm 把 pnpm 包装进内置 Node 目录，生成 `pnpm.cmd` / `pnpm.ps1` shim（插件市场 dshmarket 依赖 PATH 中的 pnpm）。
-3. 在官方仓库内执行 `pnpm --filter @deepseek-ai/dsh deploy`，把 dsh 及其生产依赖（含默认启用的 `dsh-remote`）组装为独立安装根（`runtime/dsh` 已就绪时跳过）。**前置：仓库已构建（步骤 0 的 `pnpm run build`）。**
+2. （Windows 交叉构建时）用宿主 npm 把 pnpm 包装进内置 Node 目录，生成 `pnpm.cmd` / `pnpm.ps1` shim（dsh 的插件命令从 PATH 解析 pnpm）。
+3. 在官方仓库内执行 `pnpm --filter @deepseek-ai/dsh deploy`，把 dsh 及其生产依赖组装为独立安装根（`runtime/dsh` 已就绪时跳过）。**前置：仓库已构建（步骤 0 的 `pnpm run build`）。**
 4. 生成 web profile 模板。
 5. （Windows）复制 7zip-bin 的 win 版 7za.exe 到 `tools/7za.exe`，随包分发供安装器解压归档。
 6. 调用 electron-builder 打包（Windows NSIS / Linux rpm）。**nsis / nsis-resources / winCodeSign 工具链从 GitHub 下载**，被墙时构建在 NSIS 阶段失败，处理见下「网络与缓存」。
@@ -89,11 +88,9 @@ npm run build:linux
   - 设 `ELECTRON_BUILDER_BINARIES_MIRROR=https://registry.npmmirror.com/-/binary/electron-builder-binaries/`（注意：`https://npmmirror.com/mirrors/electron-builder-binaries/` 已失效 404）；或
   - 预置缓存 `~/.cache/electron-builder/`：`nsis/nsis-3.0.4.1/`（含 `linux/makensis`）、`nsis-resources/nsis-resources-3.4.1/`、`winCodeSign/winCodeSign-2.6.0/`。
 - **npm registry 慢/不稳**：pnpm deploy 阶段可能遇 `ECONNRESET`/慢速重试，pnpm 会自动重试；持续失败可 `npm config set registry https://registry.npmmirror.com`。
-- **dsh-memory-evolve（git 依赖）**：GitHub 封锁时 `scripts/setup.mjs` 会用 `repo/vendor/dsh-memory-evolve/` 快照建本地镜像并配 `insteadOf` 重定向（详见根 README「网络受限 / 离线构建」）。
 
 ## 已知问题与踩坑
 
-- **`repo/vendor/dsh-memory-evolve` 是纯 client 插件**（bundle 由包内 `scripts/build.mjs` 产出），没有 `lib/types/*` host 构建目标；仓库根 `tsdown.config.ts` 的 workspace glob `vendor/*` 会把它纳入构建导致 `Cannot find entry`。包内 `tsdown.config.ts`（`entry: ''`）负责跳过 workspace 构建，**不要删除**。
 - 若 `prepare-runtime` 每次都重新下载 Node（日志反复出现「下载 https://nodejs.org/dist/...」），说明 `runtime/node/<platform>-<arch>/node.exe` 缺失；正常已就绪时日志应为「Node 运行时已存在」。
 - WSL 环境偶发 DNS 解析失败（`getent hosts` 对任意域名均失败），会影响 `git push` / npm / 下载，一般等待网络恢复即可。
 

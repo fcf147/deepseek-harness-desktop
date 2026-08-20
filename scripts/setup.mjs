@@ -77,77 +77,6 @@ if (!pnpm) {
   log(`pnpm: ${probe.stdout ? probe.stdout.trim() : '(来自仓库 node_modules)'}`)
 }
 
-// ── 1.5 GitHub 可达性检测 + 本地 git 镜像（离线构建方案）────
-
-/**
- * dsh-memory-evolve 仅发布在 GitHub（git 依赖，指向 #main 分支）。
- * 当 github.com 不可达时，pnpm install/deploy 会失败。本模块：
- *   1. 探测 github.com 连通性（node fetch，curl/PowerShell 可能被网络策略限制）
- *   2. 不可达时，用仓库内预置的源码快照（repo/vendor/dsh-memory-evolve，
- *      若存在）创建本地 git 裸仓库，并配置 git `url.<local>.insteadOf`
- *      把 https://github.com/dsh-external/dsh-memory-evolve.git 重定向到本地，
- *      使 pnpm 的 git 依赖解析完全离线。
- *
- * 预置快照缺失时给出明确提示（可自行从可联网机器获取该仓库源码放入
- * repo/vendor/dsh-memory-evolve/ 后重跑）。
- */
-async function ensureGitHubAccess() {
-  const probe = async () => {
-    try {
-      const res = await fetch('https://api.github.com', { signal: AbortSignal.timeout(10000) })
-      return res.ok || res.status === 404 // 404 也说明 TLS/网络可达
-    } catch {
-      return false
-    }
-  }
-  const reachable = await probe()
-  if (reachable) {
-    log('GitHub 可达，git 依赖走官方源')
-    return
-  }
-  log('GitHub 不可达，启用本地 git 镜像（离线构建方案）')
-
-  const mirrorDir = path.join(GIT_MIRROR_ROOT, 'dsh-memory-evolve.git')
-  const snapshot = path.join(REPO, 'vendor', 'dsh-memory-evolve')
-  if (!existsSync(path.join(snapshot, 'package.json'))) {
-    fail(`离线方案需要仓库预置源码快照: ${snapshot}\n请从可联网机器 clone https://github.com/dsh-external/dsh-memory-evolve.git 后复制到该目录，再重跑本脚本。`)
-  }
-
-  if (!existsSync(path.join(mirrorDir, 'HEAD'))) {
-    mkdirSync(GIT_MIRROR_ROOT, { recursive: true })
-    const work = path.join(GIT_MIRROR_ROOT, '.work-memory-evolve')
-    rmSync(work, { recursive: true, force: true })
-    cpSync(snapshot, work, { recursive: true })
-    rmSync(path.join(work, '.git'), { recursive: true, force: true })
-    const git = process.platform === 'win32' ? 'git.exe' : 'git'
-    const steps = [
-      [git, ['init', '-b', 'main'], { cwd: work }],
-      [git, ['add', '-A'], { cwd: work }],
-      [git, ['-c', 'user.name=dsh', '-c', 'user.email=dsh@local', 'commit', '-m', 'dsh-memory-evolve snapshot'], { cwd: work }],
-      [git, ['clone', '--bare', work, mirrorDir], { cwd: GIT_MIRROR_ROOT }],
-    ]
-    for (const [cmd, args, opts] of steps) {
-      const r = spawnSync(cmd, args, { stdio: 'inherit', ...opts })
-      if (r.status !== 0) fail(`本地镜像创建失败: ${cmd} ${args.join(' ')}`)
-    }
-    rmSync(work, { recursive: true, force: true })
-    log(`本地镜像已创建: ${mirrorDir}`)
-  } else {
-    log(`本地镜像已存在: ${mirrorDir}`)
-  }
-
-  // 配置 insteadOf 重定向（幂等）
-  const git = process.platform === 'win32' ? 'git.exe' : 'git'
-  for (const from of [
-    'https://github.com/dsh-external/dsh-memory-evolve.git',
-    'git+https://github.com/dsh-external/dsh-memory-evolve.git',
-    'https://github.com/dsh-external/dsh-memory-evolve',
-  ]) {
-    spawnSync(git, ['config', '--global', `url.file://${mirrorDir}.insteadOf`, from])
-  }
-  log('已配置 git insteadOf 重定向到本地镜像')
-}
-
 // ── 2. 官方仓库：依赖 + 构建 ───────────────────────────────
 
 if (!existsSync(path.join(REPO, 'package.json'))) {
@@ -155,7 +84,6 @@ if (!existsSync(path.join(REPO, 'package.json'))) {
 }
 log(`官方仓库: ${REPO}`)
 
-await ensureGitHubAccess()
 
 const repoEnv = { ...process.env }
 // 子 postinstall（cpu-features 等）直接调用 node，需把 node 所在目录放进 PATH

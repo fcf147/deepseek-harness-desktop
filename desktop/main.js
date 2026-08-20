@@ -1,8 +1,7 @@
 // dsh-desktop Electron 主进程。
 //
 // 职责：定位随包附带的 runtime（内置 Node.js + dsh 完整安装），以
-// `--profile web --port 0` 拉起 dsh web 服务（web profile 的 bundle 层已默认
-// 启用 SSH 远程开发 dsh-remote），解析其打印的 URL 行，再把 BrowserWindow
+// `--profile web --port 0` 拉起 dsh web 服务，解析其打印的 URL 行，再把 BrowserWindow
 // 指向该 URL。退出时向子进程发 SIGTERM 并等待其退出，避免孤儿 node 进程
 // 占用端口/会话锁。
 //
@@ -180,21 +179,16 @@ function ensureProfile() {
   fs.cpSync(template, profiles, { recursive: true })
 }
 
-// ── Agent preset 三档选择（Standard / Summer-Craft / Minimal）────────────────
+// ── Agent preset 两档选择（Standard / Minimal）────────────────
 
-// 桌面版首启让用户选择 agent preset（会话层组合档位），默认 Summer-Craft。
+// 桌面版首启让用户选择 agent preset（会话层组合档位），默认 Standard（官方默认档）。
 // 选择写入 $DSH_HOME/settings.yaml 的 agent-presets.default 命名空间
-// （dsh-agent-presets 插件的用户默认档位；官方默认是 standard，这里允许
-// 用户在安装时/首启时覆盖为 Summer-Craft 或其他档位）。
+// （dsh-agent-presets 插件的用户默认档位；本仓库已移除自定义 summer-craft 预设
+// 及全部第三方/自定义插件，仅保留官方 harness + 桌面壳）。
 const PRESET_CHOICES = [
   {
-    id: 'summer-craft',
-    label: 'Summer-Craft（推荐）',
-    description: '精装修档：完整编码 agent + 自动代码评审（dsh-code-review）+ 文档标准（dsh-doc-standards）+ 增强 plan-mode + 跨会话记忆。',
-  },
-  {
     id: 'standard',
-    label: 'Standard',
+    label: 'Standard（推荐）',
     description: '官方标准档：完整编码 agent，官方默认组合，无额外增强。',
   },
   {
@@ -210,9 +204,9 @@ function presetChoicePath() {
 }
 
 /**
- * 首启（或用户未选过 preset）时弹出三档选择框，把结果写入
+ * 首启（或用户未选过 preset）时弹出档位选择框，把结果写入
  * $DSH_HOME/settings.yaml（agent-presets.default）。用户取消则用默认档
- * Summer-Craft，不阻塞启动。
+ * Standard，不阻塞启动。
  */
 async function ensurePresetChoice() {
   const home = dshHome()
@@ -221,7 +215,7 @@ async function ensurePresetChoice() {
   if (fs.existsSync(marker)) {
     return // 已选过
   }
-  let chosen = 'summer-craft' // 默认档
+  let chosen = 'standard' // 默认档
   let remember = true // 默认记住；对话框异常时按记住处理
   try {
     const { response, checkboxChecked } = await dialog.showMessageBox({
@@ -230,7 +224,7 @@ async function ensurePresetChoice() {
       message: '选择会话级 Agent 预设（可在设置中随时更改）',
       detail: PRESET_CHOICES.map((p, i) => `${i + 1}. ${p.label} — ${p.description}`).join('\n\n'),
       buttons: PRESET_CHOICES.map((p) => p.label),
-      defaultId: 0, // Summer-Craft
+      defaultId: 0, // Standard
       cancelId: -1,
       checkboxLabel: '记住选择，下次不再询问',
       checkboxChecked: true,
@@ -246,7 +240,7 @@ async function ensurePresetChoice() {
       console.log(`[dsh-desktop] 用户未勾选记住，本次使用 ${chosen}，下次启动将重新询问`)
     }
   } catch (error) {
-    console.warn('[dsh-desktop] preset 选择框异常，使用默认档 Summer-Craft:', String(error))
+    console.warn('[dsh-desktop] preset 选择框异常，使用默认档 Standard:', String(error))
   }
   // 写入 settings.yaml（YAML 格式，agent-presets.default 命名空间）
   const settingsPath = path.join(home, 'settings.yaml')
@@ -274,9 +268,9 @@ async function startServer() {
   const bin = dshBin()
   const args = [bin, '--profile', 'web', '--port', '0']
   // 内置 Node 的 bin 目录加入 PATH：prepare-runtime 已把 pnpm 预置在那里
-  // （win32: node.exe 同目录 pnpm.cmd；linux: bin/pnpm）。dshmarket 的 pnpm
+  // （win32: node.exe 同目录 pnpm.cmd；linux: bin/pnpm）。dsh 的 pnpm
   // 探测（probePnpm）与 `dsh plugin` 命令（spawnSync('pnpm')）都从 PATH 解析，
-  // 不补上则插件市场报 "pnpm not found"（corepack/npm 也不在 PATH，运行期
+  // 不补上则插件命令报 "pnpm not found"（corepack/npm 也不在 PATH，运行期
   // 安装会失败；构建期预置 + 此处 PATH 即可，全程零运行期写入）。
   const nodeBinDir = path.dirname(node)
   const env = {

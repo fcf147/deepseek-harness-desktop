@@ -60,11 +60,6 @@ allowBuilds:
   node-addon-require-builtin: false
   # JSONL durability calls MoveFileExW with write-through publication on Windows.
   koffi: true
-  # SSH remote development (dsh-remote): ssh2's install attempts the optional
-  # crypto binding and exits 0 even when it fails; cpu-features is its optional
-  # native accelerator. Both are reviewed and safe to run.
-  ssh2: true
-  cpu-features: true
   # The Python runtime deploy includes the reviewed workspace postinstall that
   # restores the executable bit on node-pty's macOS spawn helper.
   '@deepseek-ai/dsh-subprocess-local@file:packages/subprocess/subprocess-local': true
@@ -82,7 +77,6 @@ minimumReleaseAgeExclude:
   - node-addon-require-builtin-win32-ia32-msvc@0.1.4
   - node-addon-require-builtin-win32-x64-msvc@0.1.4
   - node-addon-require-builtin@0.1.4
-  - dshmarket@1.9.0
 
 # 交叉构建（Linux 构建机出 Windows 安装包）：让 pnpm 除当前平台外，
 # 同时安装 win32-x64 平台二进制。pnpm deploy 走 hoisted 布局时这些平台包会
