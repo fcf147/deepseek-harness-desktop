@@ -119,9 +119,11 @@ let release
   }
 }
 
-// 4) 上传资产：desktop/dist 下匹配扩展名的文件（裸二进制 body，单文件上限 2GB）
+// 4) 上传资产：desktop/dist 下匹配扩展名（--ext 支持逗号分隔，如 "exe,rpm"）
+//    的文件（裸二进制 body，单文件上限 2GB）
+const exts = args.ext.split(',').map((e) => e.trim().replace(/^\./, '')).filter(Boolean)
 const files = readdirSync(DIST)
-  .filter((name) => name.endsWith(`.${args.ext}`))
+  .filter((name) => exts.some((e) => name.endsWith(`.${e}`)))
   .map((name) => path.join(DIST, name))
   .filter((f) => statSync(f).isFile())
 
@@ -129,7 +131,6 @@ if (files.length === 0) {
   console.error(`desktop/dist 下没有匹配 .${args.ext} 的产物`)
   process.exit(1)
 }
-
 for (const file of files) {
   const name = path.basename(file)
   const size = (statSync(file).size / 1024 / 1024).toFixed(1)

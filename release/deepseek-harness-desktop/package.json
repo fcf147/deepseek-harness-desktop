@@ -2,6 +2,7 @@
   "name": "dsh-desktop",
   "version": "0.1.2",
   "description": "DeepSeek Harness 桌面壳（Windows NSIS + Linux rpm）：Windows 内置最新合规 Node.js 运行时（安装期检测系统 Node 并静默补齐），Linux 使用系统 Node 并按发行版提示补全。",
+  "homepage": "https://gitee.com/summerwindow741/deepseek-harness-desktop",
   "license": "MIT",
   "main": "main.js",
   "author": "DSH Desktop",
