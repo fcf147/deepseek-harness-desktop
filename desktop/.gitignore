@@ -1,6 +1,10 @@
+# Tauri / 前端忽略规则
 node_modules/
 dist/
-runtime/
-build/
+src-tauri/target/
+src-tauri/gen/
 *.log
 .DS_Store
+
+# 本地运行时产物
+runtime/

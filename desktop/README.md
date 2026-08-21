@@ -1,110 +1,46 @@
-# dsh-desktop — DeepSeek Harness 桌面壳
+# WebUI Shell（桌面壳）
 
-基于官方 [`deepseek-harness`](https://github.com/deepseek-ai/deepseek-harness) 仓库构建的桌面版：
+基于 **Tauri 2.x（Rust + 系统 WebView）** 的通用本地 AI 服务桌面壳。第一步后端针对 **Windows + WSL2**，仅实现 **DeepSeek Harness** 一个服务：壳内置 WSL 生命周期管理，在默认发行版内安装并启动 `dsh web`，端口经 WSL2 转发到 Windows `127.0.0.1` 后由壳内 WebView 加载。
 
-- **Windows**：NSIS 安装包（`dist/*-win-setup.exe`）
-- **Linux 红帽系**：rpm 安装包（`dist/*.rpm`，RHEL / Fedora / Rocky / AlmaLinux / openEuler 等）
-- 不做 macOS。
+完整设计见仓库根：`README copy.md`。
 
-## 特性
-
-- **Node.js 按平台集成**：
-  - **Windows**：安装包内置最新合规 Node.js 运行时（构建时动态解析满足 dsh engines `^22.19.0 || >=24.0.0` 的最新 LTS，可用 `DSH_DESKTOP_NODE_VERSION` 固定）。安装时自动识别系统 Node.js 状态——系统已装合规 Node 则静默复用（写 `.use-system-node` 标记），否则**后台静默补齐**（直接用包内内置 Node，全程离线、零交互），之后才安装 harness 本体。
-  - **Linux（rpm）**：**不内置** Node.js 二进制。启动时检测系统 Node.js 状态，缺失或版本不足会按发行版（Debian/Ubuntu→apt、Fedora/RHEL→dnf、Arch→pacman 等）弹窗提示对应的安装命令，重试直到可用。
-- **纯官方 harness**：本分支（`yuanbanjiake`）已移除全部第三方 / 自定义插件（含 `dsh-remote`、`dsh-wsl-workspace` 等），桌面壳只打包官方 `deepseek-harness` 基线与其官方默认能力（standard / minimal 会话档位、官方会话基础设施）。
-- **完整 Web UI**：官方 dsh web 界面原样呈现，全部功能可用。
-- **独立用户数据**：DSH_HOME 指向 `%APPDATA%/dsh-desktop/home`（Windows）或 `~/.config/dsh-desktop/home`（Linux），与命令行 `~/.dsh` 互不干扰。
-- 系统托盘驻留、退出时有序停服（SIGTERM → 超时强杀，避免孤儿进程）。
-
-## 目录结构
+## 目录结构（对齐 README copy.md）
 
 ```
 desktop/
-  main.js                  Electron 主进程（解析 Node 来源、拉起 dsh web、解析 URL、管理窗口/托盘）
-  electron-builder.yml     打包配置（win nsis + linux rpm）
-  installer.nsh            NSIS 自定义安装脚本（检测系统 Node，静默补齐兜底）
-  assets/icon.png          应用图标
-  scripts/
-    prepare-runtime.mjs    组装 runtime：内置 Node（动态解析最新合规 LTS + 交叉 pnpm shim）
-                          + pnpm deploy dsh + profile 模板；linux 目标不内置 Node
-    build.mjs              一键构建入口（prepare-runtime -> electron-builder）
-  runtime/                 构建产物（不入库）
-    node/<platform>-<arch>/  内置免安装 Node.js（仅 Windows 等内置；linux 不生成）
-    dsh/                    dsh 安装根（node_modules 闭包，官方 harness 生产依赖）
-    templates/profiles/web/  profile 骨架
-  dist/                    发布产物输出
-    DeepSeek Harness-<ver>-win-setup.exe   Windows 安装包（单文件：Electron + 内置 Node + dsh）
-    DeepSeek Harness-<ver>-linux-x64.rpm   Linux rpm（内置 dsh，不含 Node）
+├── config/services.yaml         # 服务声明（第一步仅 deepseek_harness）
+├── scripts/bootstrap-dsh.sh     # WSL 内 DSH 安装引导脚本
+├── src/                         # 前端 (Vite + React + TS)
+│   ├── components/              # Sidebar / WebViewPanel / LogPanel / StatusBadge
+│   ├── pages/                   # ServiceList / ServiceDetail
+│   ├── api/                     # proxy.ts / wsl.ts（Tauri invoke 封装）
+│   ├── config/services.ts       # services.yaml 加载与解析
+│   ├── App.tsx / main.tsx
+│   └── styles.css
+├── src-tauri/                   # Rust 后端
+│   ├── src/                     # main.rs / lib.rs / wsl.rs / proxy.rs / health.rs / commands.rs
+│   ├── Cargo.toml
+│   └── tauri.conf.json
+├── package.json / vite.config.ts / tsconfig.json
 ```
 
-## 发布方式（单文件安装包）
+## 已知坑（README 已知限制，骨架已规避/待处理）
 
-- `DeepSeek Harness-<version>-win-setup.exe`：**单文件交付**，自包含 Electron 壳 + 应用代码 + profile 模板 + **内置 Node.js**（extraResources）+ **dsh 安装根**（extraResources），一个 exe 装完即用，无 dsh-runtime.7z 拆分。
-- `DeepSeek Harness-<version>-linux-x64.rpm`：内置 dsh（不含 Node，使用系统 Node.js）。
+- WSL 安装需重启：`wsl --install` 后壳提示重启。
+- 端口转发断连：Windows 休眠/唤醒后 WSL 端口转发可能中断，`health.rs` 带重试；彻底恢复需 `wsl --shutdown`。
+- VPN 劫持 localhost：services.yaml 用 `127.0.0.1` 而非 `localhost`。
+- dsh 版本锁定：bootstrap 脚本与 services.yaml 锁版本，请按需更新。
 
-**安装时**：安装程序（`installer.nsh` 的 `customInstall`）检测系统 Node.js——PATH 中 `node --version` 满足 `^22.19.0 || >=24.0.0` 时写 `.use-system-node` 标记复用系统 Node；否则直接使用包内内置 Node（即"后台静默补齐"，离线零交互）。main.js 启动时做严格版本校验，系统 Node 不满足要求时自动回退内置 Node。
+## 待补齐（骨架阶段）
 
-**升级/换机器**：只需重新下载并安装新 exe（安装包内含全部运行时）。
+- `src-tauri/icons/` 图标文件（ico/png/icns）需补充，否则 `tauri build` 失败。
+- Rust 后端需在 **Windows** 上真正编译验证（当前构建环境为 Linux，无 cargo，仅做骨架）。
 
-## 构建（从零到 exe，需要联网）
+## 构建与运行（需在 Windows + WSL2 开发机）
 
-构建机要求：Windows 或 Linux x64；Node.js 22+（或任意能跑 pnpm 的 Node）、pnpm ≥ 10、git。**Linux 构建机可直接交叉构建 Windows 安装包**（脚本已适配：pnpm 预置按宿主平台处理）；交叉构建时需 wine 供 electron-builder 的 rcedit 注入 exe 图标/版本资源（不装可 `--config.win.signAndEditExecutable=false` 跳过，代价是 exe 无图标/版本信息）。`repo/pnpm-workspace.yaml` 已含 `supportedArchitectures`（win32），Linux 宿主 install 后 store 会带 win32 平台原生模块，否则 win32 产物在 Windows 上启动必崩。
-
-**前置：`../repo/deepseek-harness-master/` 必须先构建**（`pnpm install && pnpm run build`，产出 `apps/cli/lib/bin.js` 与 web dist）。`prepare-runtime` 的 `pnpm deploy` 依赖它，未构建会直接报「仓库尚未构建」。最省事的方式是先在仓库根目录跑 `node scripts/setup.mjs` 完成全部准备（repo 构建 + desktop 依赖 + runtime 组装），再执行本节命令。
-
-```sh
-# 0) 构建官方仓库源码树。本仓库已预置 repo/deepseek-harness-master/（官方 rc.8 基线
-#    原样快照，依赖自洽无需补丁，直接 pnpm build 即可，无需再从 GitHub 克隆/apply）：
-cd repo/deepseek-harness-master
-pnpm install          # 首次或依赖变更后
-pnpm run build        # 必须：产出 apps/cli/lib/bin.js 与 web dist（deploy 的前置）
-cd ../..
-
-# 1) 安装桌面壳依赖
+```bash
 cd desktop
 npm install
-
-# 2) Windows 安装包（Linux 构建机交叉构建同样支持）
-npm run build:win
-# 或 Linux rpm（在 Linux 构建机上执行）
-npm run build:linux
+npm run tauri dev      # 开发模式
+npm run tauri build    # 生产打包（msi / nsis）
 ```
-
-产物在 `desktop/dist/`。构建脚本会自动：
-
-1. 组装内置 Node 运行时（**动态解析 nodejs.org 最新满足 engines `^22.19.0 || >=24.0.0` 的 LTS** 下载；`DSH_DESKTOP_NODE_VERSION` 指定固定版本，`NODE_MIRROR` 换镜像）。linux 目标不内置 Node。**已就绪自动跳过下载**（检测 `runtime/node/<platform>-<arch>/node.exe` 或 `bin/node`，离线可复用）。
-2. （Windows 交叉构建时）用宿主 npm 把 pnpm 包装进内置 Node 目录，生成 `pnpm.cmd` / `pnpm.ps1` shim（dsh 的插件命令从 PATH 解析 pnpm）。
-3. 在官方仓库内执行 `pnpm --filter @deepseek-ai/dsh deploy`，把 dsh 及其生产依赖组装为独立安装根（`runtime/dsh` 已就绪时跳过），并还原 vendored 包（cosmokit/schemastery/cordis-plugin-group）与补齐目标平台原生模块。**前置：仓库已构建（步骤 0 的 `pnpm run build`）。**
-4. 生成 web profile 模板。
-5. 调用 electron-builder 打包（Windows NSIS / Linux rpm，Node + dsh 均在 extraResources 里，单文件输出）。**nsis / nsis-resources / winCodeSign 工具链从 GitHub 下载**，被墙时构建在 NSIS 阶段失败，处理见下「网络与缓存」。
-
-## 网络与缓存（离线 / 受限网络）
-
-- **Node 运行时**：已就绪自动跳过下载；也可手动解压免安装包后 `node scripts/prepare-runtime.mjs --node <dir>` 跳过下载。
-- **electron 本体二进制**：`ELECTRON_MIRROR` 指向镜像（如 `https://npmmirror.com/mirrors/electron/`），或预置 `~/.cache/electron/electron-v<ver>-<platform>-<arch>.zip`。
-- **electron-builder 工具链（nsis / nsis-resources / winCodeSign）**：从 GitHub 下载，被墙时构建报 `Get "https://github.com/electron-userland/electron-builder-binaries/..." EOF`。解决：
-  - 设 `ELECTRON_BUILDER_BINARIES_MIRROR=https://registry.npmmirror.com/-/binary/electron-builder-binaries/`（注意：`https://npmmirror.com/mirrors/electron-builder-binaries/` 已失效 404）；或
-  - 预置缓存 `~/.cache/electron-builder/`：`nsis/nsis-3.0.4.1/`（含 `linux/makensis`）、`nsis-resources/nsis-resources-3.4.1/`、`winCodeSign/winCodeSign-2.6.0/`。
-- **npm registry 慢/不稳**：pnpm deploy 阶段可能遇 `ECONNRESET`/慢速重试，pnpm 会自动重试；持续失败可 `npm config set registry https://registry.npmmirror.com`。
-
-## 已知问题与踩坑
-
-- 若 `prepare-runtime` 每次都重新下载 Node（日志反复出现「下载 https://nodejs.org/...」），说明 `runtime/node/<platform>-<arch>/node.exe` 缺失；正常已就绪时日志应为「Node 运行时已存在」。注意：**Windows 目标的内置 Node 版本会随 nodejs.org 发布动态更新**（取最新合规 LTS），如需固定版本用 `DSH_DESKTOP_NODE_VERSION=v22.19.0 npm run build:win`。
-- Linux 目标不内置 Node：首次启动若提示「缺少 Node.js 运行环境」，按弹窗给出的发行版命令安装后点「重试」即可（Debian/Ubuntu：`sudo apt-get install -y nodejs`；Fedora/RHEL：`sudo dnf install -y nodejs`；版本不足时可改用 NodeSource 源或直接下载 LTS 二进制）。
-- WSL 环境偶发 DNS 解析失败（`getent hosts` 对任意域名均失败），会影响 `git push` / npm / 下载，一般等待网络恢复即可。
-
-## 开发调试
-
-```sh
-cd desktop
-npm install
-node scripts/prepare-runtime.mjs          # 组装本地 runtime（dev 模式复用）
-DESKTOP_DEV=1 npx electron .              # 直接跑 Electron 壳
-```
-
-`DESKTOP_DEV=1` 时 main.js 从 `./runtime` 解析内置运行时。
-
-## 注意
-
-- Linux rpm 打包需在 Linux 上执行；electron-builder 自带 rpm 生成能力，个别发行版需预装 `rpmbuild`（`dnf install rpm-build`）或 `fpm`。
-- 鸿蒙客户端壳见 `../harmony/`（鸿蒙 NEXT 无法运行 Node.js，壳以 ArkWeb 加载远程 dsh 服务地址）。

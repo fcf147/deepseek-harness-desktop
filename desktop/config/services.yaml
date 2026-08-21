@@ -1,0 +1,49 @@
+# WebUI Shell 服务声明配置
+# ------------------------------------------------------------------
+# 所有对接的 AI 服务在此声明，壳启动时动态加载服务列表。
+# 第一步后端仅实现 "deepseek_harness"（WSL 内运行）。
+#
+# 字段说明（见 README copy.md 核心功能 1）：
+#   label        显示名
+#   mode         webview_embed | api_proxy
+#                webview_embed: WebView 直接加载服务自带 Web UI
+#                api_proxy:     壳内 Rust 反向代理 API，前端自绘界面
+#   base_url     Windows 侧访问地址（WSL2 端口转发到 localhost）
+#   ui_path      界面路径
+#   health       健康检查端点
+#   install      安装方式
+#     type       wsl_script | wsl_native
+#     script_url 远程引导脚本（wsl_script）
+#     package    包名（wsl_native）
+#   autostart    启动命令
+#   depends_on   依赖（如 wsl）
+#
+# 坑点规避（README 已知限制）：
+#   - 用 127.0.0.1 而非 localhost（规避部分 VPN 劫持 localhost 的解析）
+#   - dsh 版本锁定（避免上游 CLI 变更破坏壳功能），请按需更新下方版本号
+#   - WSL 端口转发在休眠/唤醒后可能断连，health.rs 会做重试并提示 wsl --shutdown
+
+services:
+  deepseek_harness:
+    label: "DeepSeek Harness"
+    mode: webview_embed
+    base_url: "http://127.0.0.1:3080"
+    ui_path: "/"
+    health: "http://127.0.0.1:3080/"
+    install:
+      type: wsl_script
+      script_url: "scripts/bootstrap-dsh.sh"
+    autostart:
+      cmd: "dsh web --port 3080"
+    depends_on: ["wsl"]
+
+  # 预留（暂未实现）：
+  # ollama:
+  #   label: "Ollama"
+  #   mode: api_proxy
+  #   base_url: "http://127.0.0.1:11434"
+  #   api_prefix: "/api"
+  #   health: "http://127.0.0.1:11434/api/tags"
+  #   install:
+  #     type: wsl_native
+  #     package: "ollama"

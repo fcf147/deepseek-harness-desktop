@@ -1,23 +1,26 @@
 {
-  "name": "dsh-desktop",
-  "version": "0.1.2",
-  "description": "DeepSeek Harness 桌面壳（Windows NSIS + Linux rpm）：Windows 内置最新合规 Node.js 运行时（安装期检测系统 Node 并静默补齐），Linux 使用系统 Node 并按发行版提示补全。",
-  "homepage": "https://gitee.com/summerwindow741/deepseek-harness-desktop",
+  "name": "webui-shell",
+  "version": "0.1.0",
+  "description": "WebUI Shell — 通用本地 AI 服务桌面壳（Tauri 2.x + Rust 后端，第一步 WSL 后端仅 DeepSeek Harness）",
+  "type": "module",
   "license": "MIT",
-  "main": "main.js",
-  "author": "DSH Desktop",
   "scripts": {
-    "prepare-runtime": "node scripts/prepare-runtime.mjs",
-    "build:runtime": "node scripts/prepare-runtime.mjs",
-    "build:win": "node scripts/build.mjs --platform win",
-    "build:linux": "node scripts/build.mjs --platform linux",
-    "start": "electron ."
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@tauri-apps/api": "^2.1.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
   "devDependencies": {
-    "electron": "^33.2.0",
-    "electron-builder": "^25.1.8",
-    "extract-zip": "^2.0.1",
-    "tar": "^7.4.3"
+    "@tauri-apps/cli": "^2.1.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
   }
 }

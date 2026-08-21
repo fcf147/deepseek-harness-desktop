@@ -1,0 +1,29 @@
+[package]
+name = "webui-shell"
+version = "0.1.0"
+description = "WebUI Shell — 通用本地 AI 服务桌面壳（Tauri 2.x + Rust 后端）"
+authors = ["WebUI Shell"]
+license = "MIT"
+edition = "2021"
+rust-version = "1.77"
+
+[lib]
+name = "webui_shell_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri-plugin-shell = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.12", features = ["json", "stream"], default-features = false }
+thiserror = "1"
+
+[features]
+# 默认不启用任何特殊功能
+default = []
+custom-protocol = ["tauri/custom-protocol"]
