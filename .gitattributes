@@ -1,0 +1,3 @@
+# 强制 shell 脚本在 git 中始终以 LF 换行，防止 Windows checkout 转成 CRLF
+# 导致脚本内嵌后运行时 "syntax error near unexpected token `$'in\r''"
+scripts/bootstrap-dsh.sh text eol=lf

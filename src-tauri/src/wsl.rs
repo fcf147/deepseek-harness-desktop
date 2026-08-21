@@ -268,7 +268,9 @@ pub fn exec_in_distro_stdin(distro: &str, script: &str) -> (i32, String, String)
     // 写入脚本到 stdin 并关闭，触发 cat 写文件 + bash 执行。
     if let Some(mut stdin) = child.stdin.take() {
         use std::io::Write;
-        if let Err(e) = stdin.write_all(script.as_bytes()) {
+        // 兜底：移除 CRLF 的 \r（若源码被 git 转成 CRLF，bash 会因 \r 报语法错误）
+        let cleaned = script.replace("\r\n", "\n");
+        if let Err(e) = stdin.write_all(cleaned.as_bytes()) {
             return (-1, String::new(), format!("写入脚本失败: {}", e));
         }
         // stdin 在此 drop，关闭管道。
