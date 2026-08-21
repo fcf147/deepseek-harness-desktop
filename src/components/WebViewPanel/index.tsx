@@ -21,7 +21,13 @@ export function WebViewPanel({ runtime }: { runtime: ServiceRuntime | null }) {
   }
   return (
     <div className="webview-wrap">
-      <webview key={runtime.url} className="webview" src={runtime.url} allowpopups />
+      <webview
+        key={runtime.url}
+        className="webview"
+        src={runtime.url}
+        allowpopups
+        style={{ width: '100%', height: '100%', display: 'block' }}
+      />
     </div>
   )
 }

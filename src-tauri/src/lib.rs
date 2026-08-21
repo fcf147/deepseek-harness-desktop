@@ -18,6 +18,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::get_wsl_state,
             commands::install_wsl,
+            commands::check_service_installed,
             commands::install_service,
             commands::start_service,
             commands::stop_service,

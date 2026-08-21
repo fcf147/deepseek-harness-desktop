@@ -118,6 +118,32 @@ fn run_wsl(args: &[&str]) -> (i32, String, String) {
     }
 }
 
+/// 在指定发行版内同步执行一条命令，返回 (code, stdout, stderr)。
+pub fn exec_in_distro(distro: &str, command: &str) -> (i32, String, String) {
+    if !is_windows() {
+        return (-1, String::new(), "WSL is only supported on Windows".into());
+    }
+    let distro = distro.replace('\0', "");
+    let output = wsl_command(&["-d", &distro, "--", "bash", "-lc", command]).output();
+    match output {
+        Ok(o) => (
+            o.status.code().unwrap_or(-1),
+            decode_wsl_output(&o.stdout),
+            decode_wsl_output(&o.stderr),
+        ),
+        Err(e) => (-1, String::new(), e.to_string()),
+    }
+}
+
+/// 检测指定发行版内 dsh 是否已安装。
+pub fn is_dsh_installed(distro: &str) -> bool {
+    let (code, out, _err) = exec_in_distro(distro, "command -v dsh >/dev/null 2>&1 && echo 1 || echo 0");
+    if code != 0 {
+        return false;
+    }
+    out.trim() == "1"
+}
+
 /// 检测 WSL 整体状态。
 pub fn detect() -> WslState {
     let platform = if is_windows() { "win32" } else { "other" };

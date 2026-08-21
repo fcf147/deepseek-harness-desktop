@@ -49,6 +49,21 @@ pub struct InstallLog {
     pub text: String,
 }
 
+/// 检测指定服务是否已安装。
+/// 目前仅 deepseek_harness 通过 WSL 内 `dsh` 命令判断。
+#[tauri::command]
+pub fn check_service_installed(id: String, distro: Option<String>) -> bool {
+    if id != "deepseek_harness" {
+        return false;
+    }
+    let state = wsl::detect();
+    let distro = distro.or(state.default_distro);
+    match distro {
+        Some(d) => wsl::is_dsh_installed(&d),
+        None => false,
+    }
+}
+
 #[tauri::command]
 pub async fn install_service(
     app: AppHandle,

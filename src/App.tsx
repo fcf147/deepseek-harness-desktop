@@ -37,13 +37,19 @@ export default function App() {
   }, [appendLog])
 
   useEffect(() => {
-    loadServices().then((c) => {
+    loadServices().then(async (c) => {
       const list = serviceList(c)
       setServices(list)
-      // 为每个服务初始化默认 runtime，使其显示「安装」按钮
+      // 初始化 runtime，并检测各服务是否已安装（避免重复安装）
       const init: Record<string, wslApi.ServiceRuntime> = {}
       for (const s of list) {
-        init[s.id] = { id: s.id, status: 'not_installed', url: null, version: null }
+        const installed = await wslApi.checkServiceInstalled(s.id).catch(() => false)
+        init[s.id] = {
+          id: s.id,
+          status: installed ? 'installed' : 'not_installed',
+          url: null,
+          version: null,
+        }
       }
       setRuntimes(init)
     }).catch((e) => appendLog('error', String(e)))
