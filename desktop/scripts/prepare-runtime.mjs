@@ -445,6 +445,66 @@ function restoreVendoredOverrides(dest, repoDir) {
 }
 
 /**
+ * 还原仓库中「仅以 peerDependencies / devDependencies 声明的纯 workspace 包」。
+ *
+ * 背景：`pnpm deploy --legacy --prod --config.auto-install-peers=false` 不会把
+ * peer 依赖落入闭包（pnpm 认为应由宿主提供）。但 DeepSeek Harness 的众多核心
+ * 包（dsh-llm、dsh-agent、dsh-client-connection 等）都把内部工具包
+ * `@deepseek-ai/dsh-timeout`、`@deepseek-ai/dsh-scope` 等声明为 peer，官方仓库
+ * 靠 `linkWorkspacePackages: true` 的 workspace 软链解析。deploy 到独立闭包时这些
+ * 包不会落盘，运行期即 `ERR_MODULE_NOT_FOUND: Cannot find package '@deepseek-ai/dsh-timeout'`
+ * （Windows 启动崩溃的根因）。
+ *
+ * 修复：扫描仓库中**所有** `@deepseek-ai/dsh-*` workspace 包（packages/*/*），
+ * 凡是 runtime 闭包 node_modules 里缺失、且已构建出 lib/ 的，就从仓库源码复制进
+ * 闭包。这与官方 workspace 软链语义一致，且不改动官方任何代码。幂等：已存在则跳过。
+ *
+ * 安全边界：只还原「缺失」的包；若某包已在闭包中（由 deploy 正常解析），不动它，
+ * 以免覆盖 pnpm 已做好的版本解析。
+ */
+function restoreWorkspacePackages(dest, repoDir) {
+  const pkgsRoot = path.join(repoDir, 'packages')
+  if (!existsSync(pkgsRoot)) {
+    log(`警告: 未找到仓库 packages 目录: ${pkgsRoot}，跳过 workspace 包还原`)
+    return
+  }
+  const nodeModules = path.join(dest, 'node_modules')
+  const seen = new Set()
+  let count = 0
+  for (const scopeDir of readdirSync(pkgsRoot)) {
+    const scopePath = path.join(pkgsRoot, scopeDir)
+    if (!statSync(scopePath).isDirectory()) continue
+    for (const pkgDir of readdirSync(scopePath)) {
+      const pkgPath = path.join(scopePath, pkgDir)
+      if (!statSync(pkgPath).isDirectory()) continue
+      const pkgJson = path.join(pkgPath, 'package.json')
+      if (!existsSync(pkgJson)) continue
+      let name
+      try {
+        name = JSON.parse(readFileSync(pkgJson, 'utf8')).name
+      } catch {
+        continue
+      }
+      if (!name || !name.startsWith('@deepseek-ai/dsh-')) continue
+      if (seen.has(name)) continue
+      seen.add(name)
+      const target = path.join(nodeModules, ...name.split('/'))
+      if (existsSync(target)) continue // 已由 deploy 解析，跳过
+      // 包需已构建（含 lib/），否则复制源码无法运行；缺失 lib 时跳过并按警告记录。
+      if (!existsSync(path.join(pkgPath, 'lib'))) {
+        log(`警告: workspace 包 ${name} 尚未构建（缺 lib/），未还原；请在仓库先 pnpm run build`)
+        continue
+      }
+      mkdirSync(path.dirname(target), { recursive: true })
+      cpSync(pkgPath, target, { recursive: true })
+      count++
+      log(`还原 workspace 包: ${name} <- ${pkgPath}`)
+    }
+  }
+  if (count > 0) log(`补齐 ${count} 个缺失的 workspace 包到闭包`)
+}
+
+/**
  * 展开目录树中的所有符号链接为真实内容副本（幂等）。
  * 背景：pnpm 在 Linux 上生成的 node_modules/.bin/* 是符号链接；Windows 版
  * 7za 解压包含符号链接条目的 7z 归档会失败（installer.nsh 报「运行时解压
@@ -676,6 +736,10 @@ async function main() {
   }
   await deployDsh(args)
   restoreVendoredOverrides(path.join(RUNTIME_ROOT, 'dsh'), args.repo)
+  // deploy --legacy --prod 不会把以 peerDependencies 声明的纯 workspace 包
+  // （@deepseek-ai/dsh-timeout、dsh-scope 等）落入闭包，运行期会
+  // ERR_MODULE_NOT_FOUND；这里把它们从仓库已构建产物补齐到闭包。
+  restoreWorkspacePackages(path.join(RUNTIME_ROOT, 'dsh'), args.repo)
   // deploy --legacy 对平台分包（sharp/koffi 的 optionalDeps）选择不完整，
   // 从 repo pnpm store 补齐目标平台原生模块。
   await copyPlatformPackages(path.join(RUNTIME_ROOT, 'dsh'), args.repo, args.platform)
