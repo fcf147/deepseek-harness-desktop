@@ -37,6 +37,11 @@ pub fn install_wsl() -> wsl::InstallResult {
     wsl::install()
 }
 
+// 编译期内嵌的 DeepSeek Harness 安装引导脚本（项目根 scripts/bootstrap-dsh.sh）。
+// 相对路径基于 src-tauri/src/commands.rs -> ../../.. = 仓库根。
+// include_str! 保证：脚本内容随二进制一起分发，绿色版 exe 拷走即用，无需远程拉取。
+const BOOTSTRAP_SCRIPT: &str = include_str!("../../../scripts/bootstrap-dsh.sh");
+
 #[tauri::command]
 pub async fn install_service(id: String, distro: Option<String>) -> Result<(), String> {
     let state = wsl::detect();
@@ -44,12 +49,9 @@ pub async fn install_service(id: String, distro: Option<String>) -> Result<(), S
         return Err(state.hint.unwrap_or_else(|| "WSL 不可用".into()));
     }
     let distro = distro.or(state.default_distro).ok_or("无可用发行版")?;
-    // 第一步：DeepSeek Harness 走 bootstrap 脚本（scripts/bootstrap-dsh.sh）。
-    // 实际打包时脚本随壳分发，这里以仓库内相对路径触发。
-    let script = format!(
-        "curl -fsSL https://raw.githubusercontent.com/summerwindow741/deepseek-harness-desktop/main/desktop/scripts/bootstrap-dsh.sh | bash"
-    );
-    let (code, _out, err) = wsl::exec_in_distro(&distro, &script);
+    // 第一步：DeepSeek Harness 走本地内嵌的 bootstrap 脚本。
+    // 通过 stdin 喂给 WSL 内的 bash 执行，避免命令行拼接转义问题。
+    let (code, _out, err) = wsl::exec_in_distro_stdin(&distro, BOOTSTRAP_SCRIPT);
     if code != 0 {
         return Err(format!("安装失败: {}", err));
     }

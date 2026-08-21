@@ -1,0 +1,63 @@
+name: Build Windows Portable
+
+on:
+  workflow_dispatch:      # 手动触发
+  push:
+    branches: [main, master, webui-shell]
+    tags: ['v*']          # 打 tag 时自动构建
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Node.js 20 LTS（与 package.json / bootstrap 锁版本一致）
+      # 注：项目未提交 package-lock.json，故不启用 npm cache
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Rust stable 工具链
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      # 缓存 Cargo 依赖，加速后续构建
+      # 项目暂未提交 Cargo.lock，故 key 用常量化；生成 lock 后可改为基于 hashFiles
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            src-tauri/target
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      # 安装前端依赖（项目未提交 package-lock.json，故用 npm install 而非 npm ci）
+      - name: Install frontend deps
+        run: npm install
+
+      # 用根目录 logo.png 生成 Tauri 图标（含 exe 图标与托盘图标）
+      - name: Generate icons
+        run: npm run tauri icon logo.png
+
+      # 编译 release 并打包为 Windows 便携版（不产 msi/nsis）
+      # tauri-action 在 Windows 上支持 portable 目标；此处用 no-bundle 直接取绿色 exe 更贴近"免安装"
+      - name: Build Windows portable exe
+        run: npm run tauri build -- --no-bundle
+
+      # 上传绿色 exe 作为可下载 artifact
+      - name: Upload portable exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: webui-shell-windows-portable
+          path: src-tauri/target/release/*.exe
+          if-no-files-found: error

@@ -189,15 +189,36 @@ pub fn spawn_in_distro(distro: &str, command: &str) -> Option<Child> {
         .ok()
 }
 
-/// 在指定发行版内同步执行命令并返回输出（用于检测/安装阶段）。
-pub fn exec_in_distro(distro: &str, command: &str) -> (i32, String, String) {
+/// 在指定发行版内通过 stdin 把脚本内容喂给 `bash` 执行并返回输出。
+///
+/// 用于安装阶段：脚本内容由壳内嵌（见 commands.rs 的 include_str!），
+/// 通过 stdin 传入避免拼接到命令行导致的转义/长度问题。
+/// 执行方式等价于 `wsl -d <distro> -- bash -s`，`bash -s` 从 stdin 读取脚本。
+pub fn exec_in_distro_stdin(distro: &str, script: &str) -> (i32, String, String) {
     if !is_windows() {
         return (-1, String::new(), "WSL is only supported on Windows".into());
     }
-    let output = Command::new("wsl")
-        .args(["-d", distro, "--", "bash", "-lc", command])
-        .output();
-    match output {
+    let mut child = match Command::new("wsl")
+        .args(["-d", distro, "--", "bash", "-s"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+    {
+        Ok(c) => c,
+        Err(e) => return (-1, String::new(), e.to_string()),
+    };
+
+    // 写入脚本到 stdin 并关闭，触发 bash -s 执行。
+    if let Some(mut stdin) = child.stdin.take() {
+        use std::io::Write;
+        if let Err(e) = stdin.write_all(script.as_bytes()) {
+            return (-1, String::new(), format!("写入脚本失败: {}", e));
+        }
+        // stdin 在此 drop，关闭管道，bash 读到 EOF 后开始执行。
+    }
+
+    match child.wait_with_output() {
         Ok(o) => (
             o.status.code().unwrap_or(-1),
             String::from_utf8_lossy(&o.stdout).to_string(),

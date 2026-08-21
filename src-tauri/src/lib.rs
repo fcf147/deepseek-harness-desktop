@@ -24,11 +24,8 @@ pub fn run() {
             commands::health_check,
             commands::proxy_request,
         ])
-        .setup(|app| {
-            // 托盘图标（可选）。图标文件需在 src-tauri/icons/ 提供。
-            if let Some(tray) = app.tray_by_id("main") {
-                let _ = tray;
-            }
+        .setup(|_app| {
+            // 当前为免安装绿色版，未启用托盘图标；如需托盘，在 tauri.conf.json 配置 trayIcon 后再补充。
             Ok(())
         })
         .run(tauri::generate_context!())
