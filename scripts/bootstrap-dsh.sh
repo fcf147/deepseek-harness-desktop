@@ -107,8 +107,13 @@ fi
 
 echo "==> 验证 Node.js: $(node -v) / npm $(npm -v)"
 
-echo "==> 全局安装 DeepSeek Harness（最新版，不锁版本）..."
-npm install -g "@deepseek-ai/dsh"
+# npm 镜像源：国内网络下载慢，默认使用 npmmirror 镜像加速。
+# 如需官方源，可通过环境变量 NPM_REGISTRY 覆盖，例如：
+#   NPM_REGISTRY=https://registry.npmjs.org/ npm install ...
+NPM_REGISTRY="${NPM_REGISTRY:-https://registry.npmmirror.com/}"
+
+echo "==> 全局安装 DeepSeek Harness（最新版，不锁版本，registry=${NPM_REGISTRY}）..."
+npm install -g "@deepseek-ai/dsh" --registry="$NPM_REGISTRY"
 
 echo "==> 验证安装..."
 dsh --version

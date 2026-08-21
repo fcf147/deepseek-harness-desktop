@@ -15,6 +15,9 @@
 use std::collections::HashMap;
 use std::process::{Child, Command, Stdio};
 
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
 use serde::Serialize;
 
 #[derive(Debug, Clone, Serialize)]
@@ -80,13 +83,22 @@ fn decode_wsl_output(bytes: &[u8]) -> String {
     String::from_utf8_lossy(bytes).replace('\0', "")
 }
 
+/// Windows 上禁止创建新的控制台窗口（避免每次命令都弹一个黑窗口）。
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
 /// 构造 wsl 命令并强制其以 UTF-8 输出（避免 UTF-16/GBK 乱码）。
 /// WSL_UTF8=1 是微软官方支持的环境变量，让 wsl.exe 输出 UTF-8。
+/// 在 Windows 上额外设置 CREATE_NO_WINDOW，防止每次调用弹出新的终端窗口。
 fn wsl_command(args: &[&str]) -> Command {
     let mut cmd = Command::new("wsl");
     cmd.args(args);
     // 强制 wsl.exe 以 UTF-8 输出，消除本地化/编码导致的乱码
     cmd.env("WSL_UTF8", "1");
+    #[cfg(windows)]
+    {
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
     cmd
 }
 
