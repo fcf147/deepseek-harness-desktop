@@ -1,42 +1,47 @@
-# WebUI Shell（deepseek-harness-desktop）
+# WebUI Shell（桌面壳）
 
-通用本地 AI 服务桌面壳。本仓库根即整个项目分支；当前活动分支 `webui-shell`
-专注于 **Windows + WSL2** 后端，第一步仅对接 **DeepSeek Harness**。
+基于 **Tauri 2.x（Rust + 系统 WebView）** 的通用本地 AI 服务桌面壳。本仓库即桌面壳项目根。
+第一步后端针对 **Windows + WSL2**，仅实现 **DeepSeek Harness** 一个服务：壳内置 WSL 生命周期管理，在默认发行版内安装并启动 `dsh web`，端口经 WSL2 转发到 Windows `127.0.0.1` 后由壳内 WebView 加载。
 
-## 仓库结构
+**Windows 开发机构建步骤**见 [`docs/windows-dev.md`](./docs/windows-dev.md)。
+
+## 目录结构
 
 ```
-deepseek-harness-desktop/          ← 仓库根（= 分支工作区）
-├── desktop/                       ← 【当前重点】Tauri 2.x 桌面壳（Rust 后端 + React 前端）
-│   ├── src/                       # 前端 (Vite + React + TS)
-│   ├── src-tauri/                 # Rust 后端（WSL 管理 / 代理 / 健康检查）
-│   ├── config/services.yaml       # 服务声明（第一步仅 deepseek_harness）
-│   ├── scripts/bootstrap-dsh.sh   # WSL 内安装引导
-│   └── docs/windows-dev.md        # Windows 开发构建指南
-│
-├── repo/deepseek-harness-master/  ← DeepSeek Harness 上游仓库副本（构建期依赖，非本项目源码）
-├── release/deepseek-harness-desktop/ ← 旧 Electron 壳发布快照（master 分支遗留，与本分支方向无关）
-├── harmony/                       ← 鸿蒙(ArkTS)壳快照（同上，独立平台）
-├── scripts/ .tools/               ← 构建/工具辅助
-├── .workbuddy/                    ← 本地工作记忆（已 gitignore，不入库）
-├── README copy.md                 ← 设计目标文档（本分支的设计依据）
-├── LICENSE / THIRD_PARTY_NOTICES.md
-└── .gitignore / lefthook.yml
+./
+├── config/services.yaml         # 服务声明（第一步仅 deepseek_harness）
+├── scripts/bootstrap-dsh.sh     # WSL 内 DSH 安装引导脚本
+├── src/                         # 前端 (Vite + React + TS)
+│   ├── components/              # Sidebar / WebViewPanel / LogPanel / StatusBadge
+│   ├── pages/                   # ServiceList / ServiceDetail
+│   ├── api/                     # proxy.ts / wsl.ts（Tauri invoke 封装）
+│   ├── config/services.ts       # services.yaml 加载与解析
+│   ├── App.tsx / main.tsx
+│   └── styles.css
+├── src-tauri/                   # Rust 后端
+│   ├── src/                     # main.rs / lib.rs / wsl.rs / proxy.rs / health.rs / commands.rs
+│   ├── Cargo.toml
+│   └── tauri.conf.json
+├── package.json / vite.config.ts / tsconfig.json
+└── docs/windows-dev.md          # Windows 开发构建指南
 ```
 
-## 重点说明
+## 已知坑（README 已知限制，骨架已规避/待处理）
 
-- **桌面壳本体是 `desktop/`**：Tauri 2.x（Rust 主进程 + 系统 WebView），前端 React。
-  详细设计与开发步骤见 `desktop/README.md` 与 `desktop/docs/windows-dev.md`。
-- `repo/deepseek-harness-master/` 是上游 harness 的**整份副本**，原用于旧 Electron 壳
-  本地拼装 dsh。对新的 Tauri 壳，它应作为外部依赖（submodule 或构建期拉取），
-  而非平铺进源码树——当前为历史遗留，整理方案见下。
-- `release/`、`harmony/` 为旧方案的发布/平台快照，与 `webui-shell` 的 Tauri 方向无关，
-  属 `master` 分支旧物，后续可清理或另立分支。
+- WSL 安装需重启：`wsl --install` 后壳提示重启。
+- 端口转发断连：Windows 休眠/唤醒后 WSL 端口转发可能中断，`health.rs` 带重试；彻底恢复需 `wsl --shutdown`。
+- VPN 劫持 localhost：services.yaml 用 `127.0.0.1` 而非 `localhost`。
+- dsh 版本锁定：bootstrap 脚本与 services.yaml 锁版本，请按需更新。
 
-## 当前分支待整理项（需确认）
+## 待补齐（骨架阶段）
 
-1. `repo/` 上游副本是否转 submodule / 移出版本库；
-2. `release/`、`harmony/` 旧快照是否删除（保留在 `master` 分支即可）。
+- `src-tauri/icons/` 图标文件（ico/png/icns）需补充，否则 `tauri build` 失败。
+- Rust 后端需在 **Windows** 上真正编译验证（当前构建环境为 Linux，无 cargo，仅做骨架）。
 
-> 设计文档正文见 `README copy.md`；桌面壳开发指南见 `desktop/docs/windows-dev.md`。
+## 构建与运行（需在 Windows + WSL2 开发机）
+
+```bash
+npm install
+npm run tauri dev      # 开发模式
+npm run tauri build    # 生产打包（msi / nsis）
+```
