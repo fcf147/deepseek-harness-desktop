@@ -7,15 +7,20 @@ interface SidebarProps {
   wsl: WslState | null
   runtimes: Record<string, ServiceRuntime>
   selectedId: string | null
+  selectedDistro: string | null
   onSelect: (id: string) => void
+  onSelectDistro: (name: string) => void
   onInstallWsl: () => void
-  onInstall: (id: string) => void
-  onStart: (id: string) => void
+  onInstall: (id: string, distro?: string) => void
+  onStart: (id: string, distro?: string) => void
   onStop: (id: string) => void
 }
 
 export function Sidebar(props: SidebarProps) {
-  const { services, wsl, runtimes, selectedId, onSelect, onInstallWsl, onInstall, onStart, onStop } = props
+  const {
+    services, wsl, runtimes, selectedId, selectedDistro,
+    onSelect, onSelectDistro, onInstallWsl, onInstall, onStart, onStop,
+  } = props
   return (
     <aside className="sidebar">
       <div className="brand">WebUI Shell</div>
@@ -29,14 +34,31 @@ export function Sidebar(props: SidebarProps) {
               <StatusBadge status={wsl.status} />
               <span className="muted">{wsl.platform}</span>
             </div>
-            {wsl.default_distro && (
-              <div className="muted small">默认发行版：{wsl.default_distro}</div>
-            )}
             {wsl.hint && <div className="hint">{wsl.hint}</div>}
             {(wsl.status === 'not_installed' || wsl.status === 'no_distro') && (
               <button className="btn" onClick={onInstallWsl}>
                 安装 / 启用 WSL
               </button>
+            )}
+            {wsl.distros.length > 0 && (
+              <div className="distro-list">
+                <div className="muted small">发行版（点击选择）：</div>
+                {wsl.distros.map((d) => {
+                  const active = selectedDistro === d.name
+                  return (
+                    <div
+                      key={d.name}
+                      className={`distro-item ${active ? 'active' : ''}`}
+                      onClick={() => onSelectDistro(d.name)}
+                      title={d.state ? `状态: ${d.state}` : undefined}
+                    >
+                      <span className="distro-name">{d.name}</span>
+                      {d.is_default && <span className="muted small">默认</span>}
+                      {d.state && <StatusBadge status={d.state.toLowerCase()} label={d.state} />}
+                    </div>
+                  )
+                })}
+              </div>
             )}
           </div>
         )}
@@ -57,12 +79,12 @@ export function Sidebar(props: SidebarProps) {
               {rt && <StatusBadge status={rt.status} />}
               <div className="service-actions">
                 {rt?.status === 'not_installed' && (
-                  <button className="btn small" onClick={(e) => { e.stopPropagation(); onInstall(s.id) }}>
+                  <button className="btn small" onClick={(e) => { e.stopPropagation(); onInstall(s.id, selectedDistro ?? undefined) }}>
                     安装
                   </button>
                 )}
                 {(rt?.status === 'installed' || rt?.status === 'stopped') && (
-                  <button className="btn small" onClick={(e) => { e.stopPropagation(); onStart(s.id) }}>
+                  <button className="btn small" onClick={(e) => { e.stopPropagation(); onStart(s.id, selectedDistro ?? undefined) }}>
                     启动
                   </button>
                 )}

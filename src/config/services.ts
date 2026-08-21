@@ -68,13 +68,22 @@ export function parseServicesYaml(text: string): ServicesFile {
   return { services }
 }
 
-/** 加载 services.yaml：优先 fetch 打包资源，失败回退到内置默认（第一步仅 deepseek_harness）。 */
+/**
+ * 加载服务声明。
+ *
+ * 注意：绿色版（bundle.active=false）不打包 config/services.yaml，
+ * 运行时 fetch 可能返回 Tauri 404 页或空内容，导致服务列表为空。
+ * 因此以内置 FALLBACK 为唯一可靠来源：即使 fetch 成功但解析为空，
+ * 也回退到 FALLBACK，保证至少存在 deepseek_harness 服务。
+ */
 export async function loadServices(): Promise<ServicesFile> {
   try {
     const res = await fetch('config/services.yaml')
     if (res.ok) {
-      const text = await res.text()
-      return parseServicesYaml(text)
+      const parsed = parseServicesYaml(await res.text())
+      if (Object.keys(parsed.services).length > 0) {
+        return parsed
+      }
     }
   } catch {
     /* 忽略，走兜底 */

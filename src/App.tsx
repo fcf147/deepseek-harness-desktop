@@ -10,6 +10,7 @@ export default function App() {
   const [wsl, setWsl] = useState<wslApi.WslState | null>(null)
   const [runtimes, setRuntimes] = useState<Record<string, wslApi.ServiceRuntime>>({})
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedDistro, setSelectedDistro] = useState<string | null>(null)
   const [logs, setLogs] = useState<LogLine[]>([])
   const [busy, setBusy] = useState(false)
 
@@ -21,6 +22,8 @@ export default function App() {
     try {
       const s = await wslApi.getWslState()
       setWsl(s)
+      // 默认选中默认发行版
+      setSelectedDistro((prev) => prev ?? s.default_distro ?? null)
     } catch (e) {
       appendLog('error', `WSL 检测失败: ${String(e)}`)
     }
@@ -28,7 +31,14 @@ export default function App() {
 
   useEffect(() => {
     loadServices().then((c) => {
-      setServices(serviceList(c))
+      const list = serviceList(c)
+      setServices(list)
+      // 为每个服务初始化默认 runtime，使其显示「安装」按钮
+      const init: Record<string, wslApi.ServiceRuntime> = {}
+      for (const s of list) {
+        init[s.id] = { id: s.id, status: 'not_installed', url: null, version: null }
+      }
+      setRuntimes(init)
     }).catch((e) => appendLog('error', String(e)))
     refreshWsl()
   }, [appendLog, refreshWsl])
@@ -49,11 +59,11 @@ export default function App() {
     }
   }
 
-  const handleInstall = async (id: string) => {
+  const handleInstall = async (id: string, distro?: string) => {
     setBusy(true)
     setRuntime({ id, status: 'installing', url: null, version: null })
     try {
-      await wslApi.installService(id)
+      await wslApi.installService(id, distro ?? selectedDistro ?? undefined)
       appendLog('info', `${id} 安装完成`)
       setRuntime({ id, status: 'installed', url: null, version: null })
     } catch (e) {
@@ -64,13 +74,14 @@ export default function App() {
     }
   }
 
-  const handleStart = async (id: string) => {
+  const handleStart = async (id: string, distro?: string) => {
     const svc = services.find((s) => s.id === id)
     if (!svc) return
     setBusy(true)
     setRuntime({ id, status: 'starting', url: null, version: null })
     try {
       const rt = await wslApi.startService(id, {
+        distro: distro ?? selectedDistro ?? undefined,
         autostartCmd: svc.autostart.cmd,
         healthUrl: svc.health,
       })
@@ -106,7 +117,9 @@ export default function App() {
         wsl={wsl}
         runtimes={runtimes}
         selectedId={selectedId}
+        selectedDistro={selectedDistro}
         onSelect={setSelectedId}
+        onSelectDistro={setSelectedDistro}
         onInstallWsl={handleInstallWsl}
         onInstall={handleInstall}
         onStart={handleStart}

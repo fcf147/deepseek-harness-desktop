@@ -41,6 +41,16 @@ html, body, #root {
   font-size: 11px; color: #fff; text-transform: capitalize;
 }
 
+.distro-list { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+.distro-item {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px;
+  cursor: pointer; background: var(--bg-panel); font-size: 13px;
+}
+.distro-item:hover { border-color: var(--accent); }
+.distro-item.active { border-color: var(--accent); background: #20283a; }
+.distro-name { font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 .service-item {
   padding: 10px; border: 1px solid var(--border); border-radius: 8px;
   margin-bottom: 8px; cursor: pointer; background: var(--bg-panel);
