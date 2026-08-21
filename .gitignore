@@ -35,6 +35,10 @@ deepseek-harness.json
 .DS_Store
 Thumbs.db
 
+# ── 本地工作记忆 / IDE 辅助（不入库）────────────────────
+.workbuddy/
+.workbuddy/**
+
 # ── release 历史备份（git-archive 下）────────────────────
 .git-archive/
 
