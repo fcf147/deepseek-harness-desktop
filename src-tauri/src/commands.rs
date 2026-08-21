@@ -38,9 +38,9 @@ pub fn install_wsl() -> wsl::InstallResult {
 }
 
 // 编译期内嵌的 DeepSeek Harness 安装引导脚本（项目根 scripts/bootstrap-dsh.sh）。
-// 相对路径基于 src-tauri/src/commands.rs -> ../../.. = 仓库根。
+// 相对路径基于 src-tauri/src/commands.rs -> ../.. = 仓库根（src/ -> src-tauri/ -> 仓库根）。
 // include_str! 保证：脚本内容随二进制一起分发，绿色版 exe 拷走即用，无需远程拉取。
-const BOOTSTRAP_SCRIPT: &str = include_str!("../../../scripts/bootstrap-dsh.sh");
+const BOOTSTRAP_SCRIPT: &str = include_str!("../../scripts/bootstrap-dsh.sh");
 
 #[tauri::command]
 pub async fn install_service(id: String, distro: Option<String>) -> Result<(), String> {

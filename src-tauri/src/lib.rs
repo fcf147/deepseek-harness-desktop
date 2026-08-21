@@ -5,8 +5,8 @@ mod health;
 mod proxy;
 mod wsl;
 
-use commands::{AppState, ProcessRegistry};
-use tauri::Manager;
+use commands::AppState;
+use wsl::ProcessRegistry;
 
 /// 启动 Tauri 应用，注册命令并注入共享状态。
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
