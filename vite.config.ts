@@ -15,7 +15,9 @@ export default defineConfig({
     watch: { ignored: ['**/src-tauri/**'] },
   },
   build: {
-    outDir: 'dist',
+    // Tauri 的 frontendDist 为 "dist"（相对 src-tauri/），故产物输出到 src-tauri/dist/
+    // 注意：outDir 相对 Vite root（项目根），直接写子目录路径即可，勿加 "../"
+    outDir: 'src-tauri/dist',
     emptyOutDir: true,
     target: 'es2021',
   },
