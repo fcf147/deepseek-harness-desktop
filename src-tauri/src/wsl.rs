@@ -244,25 +244,34 @@ pub fn exec_in_distro_stdin(distro: &str, script: &str) -> (i32, String, String)
     // 防御：清理发行版名中的 NUL（避免 Command spawn 时报 nul byte found）
     let distro = distro.replace('\0', "");
 
-    // 用 bash 显式执行 stdin 中的脚本。
-    // 通过 `bash -s` 从 stdin 读取；WSL_UTF8=1 强制 wsl.exe 输出 UTF-8 避免乱码。
-    let mut child = match wsl_command(&["-d", &distro, "--", "bash", "-s"])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
+    // 把脚本写入 WSL 临时文件，再用 /bin/bash 显式执行。
+    // 相比 `bash -s` 的 stdin 方式，这样可以明确使用 bash 绝对路径，
+    // 避免因执行 shell 被解析为 sh/dash 而报 "set: pipefail: invalid option name"。
+    // 命令：cat > /tmp/webui_bootstrap.sh && /bin/bash /tmp/webui_bootstrap.sh
+    let mut child = match wsl_command(&[
+        "-d",
+        &distro,
+        "--",
+        "/bin/bash",
+        "-c",
+        "cat > /tmp/webui_bootstrap.sh && /bin/bash /tmp/webui_bootstrap.sh",
+    ])
+    .stdin(Stdio::piped())
+    .stdout(Stdio::piped())
+    .stderr(Stdio::piped())
+    .spawn()
     {
         Ok(c) => c,
         Err(e) => return (-1, String::new(), e.to_string()),
     };
 
-    // 写入脚本到 stdin 并关闭，触发 bash -s 执行。
+    // 写入脚本到 stdin 并关闭，触发 cat 写文件 + bash 执行。
     if let Some(mut stdin) = child.stdin.take() {
         use std::io::Write;
         if let Err(e) = stdin.write_all(script.as_bytes()) {
             return (-1, String::new(), format!("写入脚本失败: {}", e));
         }
-        // stdin 在此 drop，关闭管道，bash 读到 EOF 后开始执行。
+        // stdin 在此 drop，关闭管道。
     }
 
     match child.wait_with_output() {

@@ -10,7 +10,9 @@
 #   - dsh 锁版本（默认 0.1.0，避免上游 CLI 变更破坏壳），可改下方 DSH_VERSION
 #   - 区分 Ubuntu/Debian 与 Fedora；其他发行版显式报错而非静默失败
 # ============================================================================
-set -euo pipefail
+set -eu
+# pipefail 仅 bash 支持；在 sh/dash 下跳过，避免 "set: pipefail: invalid option name"
+if [ -n "${BASH_VERSION:-}" ]; then set -o pipefail; fi
 
 DSH_VERSION="${DSH_VERSION:-0.1.0}"
 
