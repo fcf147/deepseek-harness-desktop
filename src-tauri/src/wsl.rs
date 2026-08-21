@@ -80,12 +80,22 @@ fn decode_wsl_output(bytes: &[u8]) -> String {
     String::from_utf8_lossy(bytes).replace('\0', "")
 }
 
+/// 构造 wsl 命令并强制其以 UTF-8 输出（避免 UTF-16/GBK 乱码）。
+/// WSL_UTF8=1 是微软官方支持的环境变量，让 wsl.exe 输出 UTF-8。
+fn wsl_command(args: &[&str]) -> Command {
+    let mut cmd = Command::new("wsl");
+    cmd.args(args);
+    // 强制 wsl.exe 以 UTF-8 输出，消除本地化/编码导致的乱码
+    cmd.env("WSL_UTF8", "1");
+    cmd
+}
+
 /// 在 Windows 上运行 `wsl <args>`，返回 (code, stdout, stderr)。
 fn run_wsl(args: &[&str]) -> (i32, String, String) {
     if !is_windows() {
         return (-1, String::new(), "WSL is only supported on Windows".into());
     }
-    let output = Command::new("wsl").args(args).output();
+    let output = wsl_command(args).output();
     match output {
         Ok(o) => (
             o.status.code().unwrap_or(-1),
@@ -215,8 +225,7 @@ pub fn spawn_in_distro(distro: &str, command: &str) -> Option<Child> {
     if !is_windows() {
         return None;
     }
-    Command::new("wsl")
-        .args(["-d", distro, "--", "bash", "-lc", command])
+    wsl_command(&["-d", distro, "--", "bash", "-lc", command])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
@@ -235,8 +244,9 @@ pub fn exec_in_distro_stdin(distro: &str, script: &str) -> (i32, String, String)
     // 防御：清理发行版名中的 NUL（避免 Command spawn 时报 nul byte found）
     let distro = distro.replace('\0', "");
 
-    let mut child = match Command::new("wsl")
-        .args(["-d", &distro, "--", "bash", "-s"])
+    // 用 bash 显式执行 stdin 中的脚本。
+    // 通过 `bash -s` 从 stdin 读取；WSL_UTF8=1 强制 wsl.exe 输出 UTF-8 避免乱码。
+    let mut child = match wsl_command(&["-d", &distro, "--", "bash", "-s"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
