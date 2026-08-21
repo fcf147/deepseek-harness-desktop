@@ -4,6 +4,8 @@
 
 完整设计见仓库根：`README copy.md`。
 
+**Windows 开发机构建步骤**见 [`docs/windows-dev.md`](./docs/windows-dev.md)。
+
 ## 目录结构（对齐 README copy.md）
 
 ```
