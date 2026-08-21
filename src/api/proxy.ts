@@ -17,11 +17,15 @@ export async function callServiceAPI(baseUrl: string, path: string, opts?: Reque
   const url = `${baseUrl}${path}`
   // @ts-ignore - __TAURI__ 在 Tauri 运行时存在
   if (typeof window !== 'undefined' && (window as any).__TAURI__) {
+    // RequestInit.body 类型为 BodyInit | null | undefined，而 ProxyRequest.body 是 string；
+    // 仅在 body 为字符串时传递，避免类型不匹配（二进制/FormData 等走 Tauri 代理的场景当前不支持）。
+    const body: string | undefined =
+      typeof opts?.body === 'string' ? opts.body : opts?.body != null ? String(opts.body) : undefined
     return JSON.parse(
       await proxy({
         url,
         method: opts?.method ?? 'GET',
-        body: opts?.body,
+        body,
       }),
     )
   }

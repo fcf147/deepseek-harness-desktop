@@ -1,4 +1,3 @@
-import React from 'react'
 import type { ServiceRuntime } from '../../api/wsl'
 
 /**

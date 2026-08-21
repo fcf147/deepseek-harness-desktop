@@ -1,4 +1,3 @@
-import React from 'react'
 import type { ServiceConfig } from '../../config/services'
 import type { WslState, ServiceRuntime } from '../../api/wsl'
 import StatusBadge from '../StatusBadge'

@@ -1,5 +1,3 @@
-import React from 'react'
-
 const COLOR: Record<string, string> = {
   running: '#22c55e',
   installed: '#3b82f6',

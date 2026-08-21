@@ -2,11 +2,10 @@ import React, { useEffect, useState, useCallback } from 'react'
 import Sidebar from './components/Sidebar'
 import WebViewPanel from './components/WebViewPanel'
 import LogPanel, { type LogLine } from './components/LogPanel'
-import { loadServices, serviceList, type ServiceConfig, type ServicesFile } from './config/services'
+import { loadServices, serviceList, type ServiceConfig } from './config/services'
 import * as wslApi from './api/wsl'
 
 export default function App() {
-  const [cfg, setCfg] = useState<ServicesFile | null>(null)
   const [services, setServices] = useState<ServiceConfig[]>([])
   const [wsl, setWsl] = useState<wslApi.WslState | null>(null)
   const [runtimes, setRuntimes] = useState<Record<string, wslApi.ServiceRuntime>>({})
@@ -29,7 +28,6 @@ export default function App() {
 
   useEffect(() => {
     loadServices().then((c) => {
-      setCfg(c)
       setServices(serviceList(c))
     }).catch((e) => appendLog('error', String(e)))
     refreshWsl()

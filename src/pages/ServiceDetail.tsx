@@ -1,4 +1,3 @@
-import React from 'react'
 import type { ServiceConfig } from '../config/services'
 import type { ServiceRuntime } from '../api/wsl'
 
