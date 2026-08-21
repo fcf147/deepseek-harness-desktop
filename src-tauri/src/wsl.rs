@@ -51,6 +51,35 @@ fn is_windows() -> bool {
     cfg!(target_os = "windows")
 }
 
+/// 解码 WSL 命令输出为干净 UTF-8 字符串。
+///
+/// WSL 在 Windows 上可能以 UTF-16LE 输出（每个 ASCII 字符后带 \x00），
+/// 若直接用 from_utf8_lossy 解码会残留 NUL 字节，进而导致：
+///   - 发行版列表解析出 "NAME"/"Unknown" 等脏数据（Bug 1）
+///   - 把含 NUL 的发行版名传给 Command 时触发 "nul byte found in provided data"（Bug 2）
+/// 这里做 UTF-16 探测并按 UTF-16LE 解码，最后再清除所有残留 NUL。
+fn decode_wsl_output(bytes: &[u8]) -> String {
+    // UTF-16LE 探测：统计 NUL 字节密度。纯 ASCII 的 UTF-8 应无 NUL；
+    // UTF-16LE 的 ASCII 文本 NUL 占比接近一半。
+    if !bytes.is_empty() {
+        let nuls = bytes.iter().filter(|&&b| b == 0).count();
+        if nuls > 0 && nuls * 2 >= bytes.len() {
+            // 按 UTF-16LE 解码
+            let units: Vec<u16> = bytes
+                .chunks_exact(2)
+                .map(|c| u16::from_le_bytes([c[0], c[1]]))
+                .collect();
+            if !units.is_empty() {
+                if let Ok(s) = String::from_utf16(&units) {
+                    return s.replace('\0', "");
+                }
+            }
+        }
+    }
+    // 常规 UTF-8，清除任何残留 NUL
+    String::from_utf8_lossy(bytes).replace('\0', "")
+}
+
 /// 在 Windows 上运行 `wsl <args>`，返回 (code, stdout, stderr)。
 fn run_wsl(args: &[&str]) -> (i32, String, String) {
     if !is_windows() {
@@ -60,8 +89,8 @@ fn run_wsl(args: &[&str]) -> (i32, String, String) {
     match output {
         Ok(o) => (
             o.status.code().unwrap_or(-1),
-            String::from_utf8_lossy(&o.stdout).to_string(),
-            String::from_utf8_lossy(&o.stderr).to_string(),
+            decode_wsl_output(&o.stdout),
+            decode_wsl_output(&o.stderr),
         ),
         Err(e) => (-1, String::new(), e.to_string()),
     }
@@ -127,14 +156,19 @@ fn parse_distro_list(text: &str) -> (Vec<Distro>, Option<String>) {
         if cleaned.is_empty() {
             continue;
         }
-        if cleaned.eq_ignore_ascii_case("NAME STATE VERSION") {
-            continue;
-        }
         let parts: Vec<&str> = cleaned.split_whitespace().collect();
         if parts.is_empty() || parts[0].chars().all(|c| c == '-') {
             continue;
         }
+        // 跳过表头：用 split_whitespace 归一化后判断（原始串可能含多空格）
+        if parts[0].eq_ignore_ascii_case("NAME") {
+            continue;
+        }
         let name = parts[0].to_string();
+        // 过滤含 NUL 的畸形名称（异常编码残留）
+        if name.contains('\0') || name.is_empty() {
+            continue;
+        }
         let state = parts.get(1).unwrap_or(&"Unknown").to_string();
         let version = parts.get(2).unwrap_or(&"").to_string();
         if was_default {
@@ -198,8 +232,11 @@ pub fn exec_in_distro_stdin(distro: &str, script: &str) -> (i32, String, String)
     if !is_windows() {
         return (-1, String::new(), "WSL is only supported on Windows".into());
     }
+    // 防御：清理发行版名中的 NUL（避免 Command spawn 时报 nul byte found）
+    let distro = distro.replace('\0', "");
+
     let mut child = match Command::new("wsl")
-        .args(["-d", distro, "--", "bash", "-s"])
+        .args(["-d", &distro, "--", "bash", "-s"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -221,8 +258,8 @@ pub fn exec_in_distro_stdin(distro: &str, script: &str) -> (i32, String, String)
     match child.wait_with_output() {
         Ok(o) => (
             o.status.code().unwrap_or(-1),
-            String::from_utf8_lossy(&o.stdout).to_string(),
-            String::from_utf8_lossy(&o.stderr).to_string(),
+            decode_wsl_output(&o.stdout),
+            decode_wsl_output(&o.stderr),
         ),
         Err(e) => (-1, String::new(), e.to_string()),
     }
