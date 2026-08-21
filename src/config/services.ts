@@ -100,7 +100,8 @@ const FALLBACK: Record<string, ServiceConfig> = {
     ui_path: '/',
     health: 'http://127.0.0.1:3080/',
     install: { type: 'wsl_script', script_url: 'scripts/bootstrap-dsh.sh' },
-    autostart: { cmd: 'dsh web --port 3080' },
+    // --no-open 禁止 dsh 自动打开浏览器（壳内用 WebView 嵌入）
+    autostart: { cmd: 'dsh web --port 3080 --no-open' },
     depends_on: ['wsl'],
   },
 }

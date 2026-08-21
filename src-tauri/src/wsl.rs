@@ -232,21 +232,24 @@ pub fn spawn_in_distro(distro: &str, command: &str) -> Option<Child> {
         .ok()
 }
 
-/// 在指定发行版内通过 stdin 把脚本内容喂给 `bash` 执行并返回输出。
+/// 在指定发行版内通过 stdin 把脚本内容喂给 `bash` 执行。
 ///
-/// 用于安装阶段：脚本内容由壳内嵌（见 commands.rs 的 include_str!），
-/// 通过 stdin 传入避免拼接到命令行导致的转义/长度问题。
-/// 执行方式等价于 `wsl -d <distro> -- bash -s`，`bash -s` 从 stdin 读取脚本。
-pub fn exec_in_distro_stdin(distro: &str, script: &str) -> (i32, String, String) {
+/// 相比 `bash -s`，这里把脚本写入 WSL 临时文件后用 `/bin/bash` 显式执行，
+/// 避免执行 shell 被解析为 sh/dash 而报 "set: pipefail: invalid option name"。
+///
+/// `on_line(stream, line)` 会在每行输出时被回调（stream 为 "out" 或 "err"），
+/// 用于前端流式显示安装日志；返回值仍包含完整 stdout / stderr 供后续使用。
+pub fn exec_in_distro_stdin(
+    distro: &str,
+    script: &str,
+    on_line: impl Fn(&str, &str) + Send + Sync + 'static,
+) -> (i32, String, String) {
     if !is_windows() {
         return (-1, String::new(), "WSL is only supported on Windows".into());
     }
     // 防御：清理发行版名中的 NUL（避免 Command spawn 时报 nul byte found）
     let distro = distro.replace('\0', "");
 
-    // 把脚本写入 WSL 临时文件，再用 /bin/bash 显式执行。
-    // 相比 `bash -s` 的 stdin 方式，这样可以明确使用 bash 绝对路径，
-    // 避免因执行 shell 被解析为 sh/dash 而报 "set: pipefail: invalid option name"。
     // 命令：cat > /tmp/webui_bootstrap.sh && /bin/bash /tmp/webui_bootstrap.sh
     let mut child = match wsl_command(&[
         "-d",
@@ -276,14 +279,65 @@ pub fn exec_in_distro_stdin(distro: &str, script: &str) -> (i32, String, String)
         // stdin 在此 drop，关闭管道。
     }
 
-    match child.wait_with_output() {
-        Ok(o) => (
-            o.status.code().unwrap_or(-1),
-            decode_wsl_output(&o.stdout),
-            decode_wsl_output(&o.stderr),
-        ),
-        Err(e) => (-1, String::new(), e.to_string()),
+    // 用 Arc 共享 on_line 回调，供两个读取线程调用。
+    let on_line_arc: std::sync::Arc<dyn Fn(&str, &str) + Send + Sync> =
+        std::sync::Arc::new(on_line);
+
+    let stdout_full: std::sync::Arc<std::sync::Mutex<String>> =
+        std::sync::Arc::new(std::sync::Mutex::new(String::new()));
+    let stderr_full: std::sync::Arc<std::sync::Mutex<String>> =
+        std::sync::Arc::new(std::sync::Mutex::new(String::new()));
+
+    // 逐行读取一个管道：实时回调 + 累积完整输出到 shared buffer。
+    fn pump<R: std::io::Read + Send + 'static>(
+        reader: R,
+        stream: &'static str,
+        cb: std::sync::Arc<dyn Fn(&str, &str) + Send + Sync>,
+        buf: std::sync::Arc<std::sync::Mutex<String>>,
+    ) -> std::thread::JoinHandle<()> {
+        std::thread::spawn(move || {
+            use std::io::BufRead;
+            for line in std::io::BufReader::new(reader).lines() {
+                let l = match line {
+                    Ok(l) => l,
+                    Err(_) => continue,
+                };
+                cb(stream, &l);
+                if let Ok(mut s) = buf.lock() {
+                    s.push_str(&l);
+                    s.push('\n');
+                }
+            }
+        })
     }
+
+    let handle_out = child
+        .stdout
+        .take()
+        .map(|so| pump(so, "out", on_line_arc.clone(), stdout_full.clone()));
+    let handle_err = child
+        .stderr
+        .take()
+        .map(|se| pump(se, "err", on_line_arc.clone(), stderr_full.clone()));
+
+    let status = child.wait();
+    if let Some(h) = handle_out {
+        let _ = h.join();
+    }
+    if let Some(h) = handle_err {
+        let _ = h.join();
+    }
+
+    let code = status.map(|s| s.code().unwrap_or(-1)).unwrap_or(-1);
+    let out = stdout_full
+        .lock()
+        .map(|g| decode_wsl_output(g.as_bytes()))
+        .unwrap_or_default();
+    let err = stderr_full
+        .lock()
+        .map(|g| decode_wsl_output(g.as_bytes()))
+        .unwrap_or_default();
+    (code, out, err)
 }
 
 /// 进程注册表：service_id -> child。

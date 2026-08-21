@@ -1,9 +1,16 @@
 import React, { useEffect, useState, useCallback } from 'react'
+import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import Sidebar from './components/Sidebar'
 import WebViewPanel from './components/WebViewPanel'
 import LogPanel, { type LogLine } from './components/LogPanel'
 import { loadServices, serviceList, type ServiceConfig } from './config/services'
 import * as wslApi from './api/wsl'
+
+// 后端 emit 的安装日志负载（与 commands.rs 的 InstallLog 对应）
+interface InstallLogPayload {
+  stream: 'info' | 'out' | 'error'
+  text: string
+}
 
 export default function App() {
   const [services, setServices] = useState<ServiceConfig[]>([])
@@ -43,6 +50,25 @@ export default function App() {
     refreshWsl()
   }, [appendLog, refreshWsl])
 
+  // 监听后端 emit 的安装日志，实时追加到日志面板
+  useEffect(() => {
+    let unlisten: UnlistenFn | undefined
+    let cancelled = false
+    listen<InstallLogPayload>('install-log', (event) => {
+      const p = event.payload
+      if (cancelled) return
+      const stream: LogLine['stream'] =
+        p.stream === 'error' ? 'error' : p.stream === 'info' ? 'info' : 'out'
+      appendLog(stream, p.text)
+    }).then((fn) => {
+      unlisten = fn
+    }).catch((e) => appendLog('error', `监听安装日志失败: ${String(e)}`))
+    return () => {
+      cancelled = true
+      unlisten?.()
+    }
+  }, [appendLog])
+
   const setRuntime = useCallback((rt: wslApi.ServiceRuntime) => {
     setRuntimes((prev) => ({ ...prev, [rt.id]: rt }))
   }, [])
@@ -60,8 +86,10 @@ export default function App() {
   }
 
   const handleInstall = async (id: string, distro?: string) => {
+    const targetDistro = distro ?? selectedDistro ?? '默认'
     setBusy(true)
     setRuntime({ id, status: 'installing', url: null, version: null })
+    appendLog('info', `开始安装 ${id}（发行版: ${targetDistro}）…`)
     try {
       await wslApi.installService(id, distro ?? selectedDistro ?? undefined)
       appendLog('info', `${id} 安装完成`)

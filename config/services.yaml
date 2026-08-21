@@ -20,7 +20,7 @@
 #
 # 坑点规避（README 已知限制）：
 #   - 用 127.0.0.1 而非 localhost（规避部分 VPN 劫持 localhost 的解析）
-#   - dsh 版本锁定（避免上游 CLI 变更破坏壳功能），请按需更新下方版本号
+#   - dsh 不锁版本，bootstrap 脚本始终安装最新版
 #   - WSL 端口转发在休眠/唤醒后可能断连，health.rs 会做重试并提示 wsl --shutdown
 
 services:
@@ -34,7 +34,8 @@ services:
       type: wsl_script
       script_url: "scripts/bootstrap-dsh.sh"
     autostart:
-      cmd: "dsh web --port 3080"
+      # --no-open 禁止 dsh 自动打开浏览器（壳内用 WebView 嵌入，不需要弹浏览器）
+      cmd: "dsh web --port 3080 --no-open"
     depends_on: ["wsl"]
 
   # 预留（暂未实现）：

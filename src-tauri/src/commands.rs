@@ -6,7 +6,7 @@
 use std::sync::Arc;
 
 use serde::Serialize;
-use tauri::State;
+use tauri::{AppHandle, Emitter, State};
 
 use crate::health;
 use crate::proxy::{self, ProxyRequest};
@@ -42,16 +42,37 @@ pub fn install_wsl() -> wsl::InstallResult {
 // include_str! 保证：脚本内容随二进制一起分发，绿色版 exe 拷走即用，无需远程拉取。
 const BOOTSTRAP_SCRIPT: &str = include_str!("../../scripts/bootstrap-dsh.sh");
 
+/// 安装日志事件负载：stream 为 "info" | "out" | "error"，text 为日志文本。
+#[derive(Clone, Serialize)]
+pub struct InstallLog {
+    pub stream: String,
+    pub text: String,
+}
+
 #[tauri::command]
-pub async fn install_service(id: String, distro: Option<String>) -> Result<(), String> {
+pub async fn install_service(
+    app: AppHandle,
+    id: String,
+    distro: Option<String>,
+) -> Result<(), String> {
     let state = wsl::detect();
     if state.status != "ready" {
         return Err(state.hint.unwrap_or_else(|| "WSL 不可用".into()));
     }
     let distro = distro.or(state.default_distro).ok_or("无可用发行版")?;
     // 第一步：DeepSeek Harness 走本地内嵌的 bootstrap 脚本。
-    // 通过 stdin 喂给 WSL 内的 bash 执行，避免命令行拼接转义问题。
-    let (code, _out, err) = wsl::exec_in_distro_stdin(&distro, BOOTSTRAP_SCRIPT);
+    // 通过 stdin 喂给 WSL 内的 bash 执行，逐行把输出 emit 到前端做流式日志。
+    let app = app.clone();
+    let (code, _out, err) = wsl::exec_in_distro_stdin(&distro, BOOTSTRAP_SCRIPT, move |stream, line| {
+        // 校验 UTF-8，避免 emit 失败导致安装中断
+        let _ = app.emit(
+            "install-log",
+            InstallLog {
+                stream: if stream == "err" { "error".into() } else { "out".into() },
+                text: line.to_string(),
+            },
+        );
+    });
     if code != 0 {
         return Err(format!("安装失败: {}", err));
     }
