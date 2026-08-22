@@ -21,6 +21,7 @@ pub fn run() {
             commands::check_service_installed,
             commands::install_service,
             commands::start_service,
+            commands::open_service_ui,
             commands::stop_service,
             commands::health_check,
             commands::proxy_request,

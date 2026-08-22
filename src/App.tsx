@@ -121,6 +121,10 @@ export default function App() {
       })
       setRuntime(rt)
       appendLog(rt.status === 'running' ? 'info' : 'error', `${id} -> ${rt.url ?? rt.error}`)
+      // 服务运行后，用独立 WebviewWindow 打开 Web UI（壳内 <webview> 标签不可靠）
+      if (rt.status === 'running' && rt.url) {
+        await wslApi.openServiceUi(`svc-${id}`, rt.url).catch((e) => appendLog('error', `打开 UI 失败: ${String(e)}`))
+      }
     } catch (e) {
       setRuntime({ id, status: 'error', url: null, version: null, error: String(e) })
       appendLog('error', `启动失败: ${String(e)}`)

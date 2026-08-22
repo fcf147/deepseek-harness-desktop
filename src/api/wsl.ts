@@ -63,6 +63,10 @@ export async function stopService(id: string): Promise<boolean> {
   return invoke('stop_service', { id })
 }
 
+export async function openServiceUi(label: string, url: string): Promise<void> {
+  return invoke('open_service_ui', { label, url })
+}
+
 export async function healthCheck(url: string): Promise<boolean> {
   return invoke('health_check', { url })
 }

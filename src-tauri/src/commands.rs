@@ -6,7 +6,7 @@
 use std::sync::Arc;
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
 
 use crate::health;
 use crate::proxy::{self, ProxyRequest};
@@ -62,6 +62,27 @@ pub fn check_service_installed(id: String, distro: Option<String>) -> bool {
         Some(d) => wsl::is_dsh_installed(&d),
         None => false,
     }
+}
+
+/// 打开服务 UI：创建一个独立 WebviewWindow 加载目标 URL。
+///
+/// 之所以用独立窗口而非壳内 <webview> 标签：Tauri 2 的 <webview> 标签
+/// 加载外部 http URL 在部分环境不可靠（黑屏），而 WebviewWindow 是
+/// 官方稳定可靠的方式。若同名窗口已存在则复用并聚焦，避免重复创建。
+#[tauri::command]
+pub fn open_service_ui(app: AppHandle, label: String, url: String) -> Result<(), String> {
+    // 若同名窗口已存在，直接聚焦并返回
+    if let Some(win) = app.get_webview_window(&label) {
+        let _ = win.set_focus();
+        return Ok(());
+    }
+    let parsed = url.parse::<tauri::Url>().map_err(|e| format!("无效 URL: {}", e))?;
+    WebviewWindowBuilder::new(&app, &label, WebviewUrl::External(parsed))
+        .title("WebUI Shell")
+        .inner_size(1200.0, 800.0)
+        .build()
+        .map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 #[tauri::command]
