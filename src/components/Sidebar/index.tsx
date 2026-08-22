@@ -8,6 +8,9 @@ interface SidebarProps {
   runtimes: Record<string, ServiceRuntime>
   selectedId: string | null
   selectedDistro: string | null
+  collapsed: boolean
+  onExpand: () => void
+  onCollapse: () => void
   onSelect: (id: string) => void
   onSelectDistro: (name: string) => void
   onInstallWsl: () => void
@@ -18,9 +21,32 @@ interface SidebarProps {
 
 export function Sidebar(props: SidebarProps) {
   const {
-    services, wsl, runtimes, selectedId, selectedDistro,
-    onSelect, onSelectDistro, onInstallWsl, onInstall, onStart, onStop,
+    services, wsl, runtimes, selectedId, selectedDistro, collapsed,
+    onExpand, onCollapse, onSelect, onSelectDistro, onInstallWsl, onInstall, onStart, onStop,
   } = props
+
+  // 折叠态：只显示窄条图标栏（状态灯 + 展开按钮）
+  if (collapsed) {
+    return (
+      <aside className="sidebar sidebar-collapsed">
+        <div className="collapsed-brand">W</div>
+        <div className="collapsed-status" title={wsl?.status ?? 'unknown'}>
+          <span className={`dot ${wsl?.status === 'ready' ? 'dot-on' : ''}`} />
+        </div>
+        <button className="icon-btn" title="展开侧边栏" onClick={onExpand}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M12 15l-7-7 7 7 7-7" />
+          </svg>
+        </button>
+        <button className="icon-btn" title="最小化" onClick={onCollapse}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M3 21h18M3 21V10M3 21l7-7M21 21v-9M21 21l-7-7" />
+          </svg>
+        </button>
+      </aside>
+    )
+  }
+
   return (
     <aside className="sidebar">
       <div className="brand">WebUI Shell</div>
@@ -98,6 +124,12 @@ export function Sidebar(props: SidebarProps) {
           )
         })}
       </section>
+      <button className="btn collapse-bar" onClick={onCollapse} title="最小化侧边栏">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M3 21h18M3 21V10M3 21l7-7M21 21v-9M21 21l-7-7" />
+        </svg>
+        <span>收起</span>
+      </button>
     </aside>
   )
 }

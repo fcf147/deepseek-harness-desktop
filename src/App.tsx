@@ -20,6 +20,10 @@ export default function App() {
   const [selectedDistro, setSelectedDistro] = useState<string | null>(null)
   const [logs, setLogs] = useState<LogLine[]>([])
   const [busy, setBusy] = useState(false)
+  // 沉浸模式：服务运行后自动折叠侧栏和日志栏，最大化 WebView 区域
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [logCollapsed, setLogCollapsed] = useState(false)
+  const [autoCollapse, setAutoCollapse] = useState(true)
 
   const appendLog = useCallback((stream: LogLine['stream'], text: string) => {
     setLogs((prev) => [...prev.slice(-300), { ts: Date.now(), stream, text }])
@@ -144,6 +148,29 @@ export default function App() {
   const selectedService = services.find((s) => s.id === selectedId) ?? null
   const selectedRuntime = selectedId ? runtimes[selectedId] ?? null : null
 
+  // 服务 Running 且 WebView 加载后，自动折叠侧栏与日志栏（除非用户手动展开过）
+  useEffect(() => {
+    if (selectedRuntime?.status === 'running' && autoCollapse) {
+      setSidebarCollapsed(true)
+      setLogCollapsed(true)
+    }
+  }, [selectedRuntime?.status, autoCollapse])
+
+  const handleExpandSidebar = () => {
+    setAutoCollapse(false)
+    setSidebarCollapsed(false)
+  }
+  const handleCollapseSidebar = () => {
+    setSidebarCollapsed(true)
+  }
+  const handleExpandLog = () => {
+    setAutoCollapse(false)
+    setLogCollapsed(false)
+  }
+  const handleCollapseLog = () => {
+    setLogCollapsed(true)
+  }
+
   return (
     <div className="app">
       <Sidebar
@@ -152,6 +179,9 @@ export default function App() {
         runtimes={runtimes}
         selectedId={selectedId}
         selectedDistro={selectedDistro}
+        collapsed={sidebarCollapsed}
+        onExpand={handleExpandSidebar}
+        onCollapse={handleCollapseSidebar}
         onSelect={setSelectedId}
         onSelectDistro={setSelectedDistro}
         onInstallWsl={handleInstallWsl}
@@ -180,7 +210,12 @@ export default function App() {
             <p>从左侧选择一个服务</p>
           </div>
         )}
-        <LogPanel lines={logs} />
+        <LogPanel
+          lines={logs}
+          collapsed={logCollapsed}
+          onExpand={handleExpandLog}
+          onCollapse={handleCollapseLog}
+        />
       </main>
     </div>
   )

@@ -67,6 +67,37 @@ html, body, #root {
 .btn.danger { background: var(--danger); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+/* 沉浸模式：折叠的侧边栏（窄条图标栏） */
+.sidebar-collapsed {
+  width: 48px; flex: 0 0 48px;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 10px 4px; gap: 14px;
+}
+.collapsed-brand {
+  font-size: 20px; font-weight: 800; color: var(--accent);
+  width: 30px; height: 30px; border: 1px solid var(--border); border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+}
+.collapsed-status .dot {
+  display: block; width: 12px; height: 12px; border-radius: 50%;
+  background: var(--muted); opacity: 0.5;
+}
+.collapsed-status .dot.dot-on { background: #22c55e; opacity: 1; box-shadow: 0 0 6px #22c55e; }
+
+/* 图标按钮（折叠栏用） */
+.icon-btn {
+  background: transparent; color: var(--muted); border: none; cursor: pointer;
+  padding: 6px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center;
+}
+.icon-btn:hover { color: var(--text); background: var(--bg-panel); }
+
+/* 展开态侧栏底部「收起」按钮 */
+.collapse-bar {
+  width: 100%; margin-top: auto; display: flex; align-items: center; justify-content: center; gap: 6px;
+  background: transparent; color: var(--muted); border: 1px solid var(--border);
+}
+.collapse-bar:hover { color: var(--text); border-color: var(--accent); }
+
 .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 .main-header {
   height: 40px; display: flex; align-items: center; justify-content: space-between;
@@ -97,10 +128,19 @@ html, body, #root {
 .service-detail { padding: 16px; }
 .service-detail h2 { margin: 0 0 8px; }
 
-.log-panel {
-  height: 160px; flex: 0 0 160px; overflow-y: auto;
+/* 展开态日志：外层容器（头部 + 内容） */
+.log-panel-wrap {
+  flex: 0 0 160px; height: 160px; display: flex; flex-direction: column;
   background: #0a0c10; border-top: 1px solid var(--border);
-  padding: 8px; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 12px;
+}
+.log-panel-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 2px 8px; font-size: 11px; color: var(--muted);
+  border-bottom: 1px solid var(--border); flex: 0 0 auto;
+}
+.log-panel {
+  flex: 1; min-height: 0; overflow-y: auto;
+  padding: 4px 8px; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 12px;
 }
 .log-empty { color: var(--muted); }
 .log-line { padding: 1px 0; }
@@ -108,3 +148,11 @@ html, body, #root {
 .log-error .log-text { color: var(--danger); }
 .log-info .log-text { color: #93c5fd; }
 .log-out .log-text { color: var(--text); }
+
+/* 折叠态日志：底部窄条 */
+.log-panel-collapsed {
+  height: 28px; flex: 0 0 28px;
+  display: flex; align-items: center; justify-content: space-between;
+  background: #0a0c10; border-top: 1px solid var(--border); padding: 0 8px;
+}
+.log-panel-label { font-size: 11px; color: var(--muted); cursor: default; }
