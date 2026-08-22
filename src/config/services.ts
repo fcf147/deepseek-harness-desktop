@@ -1,8 +1,11 @@
 // services.yaml 加载与解析
 // ----------------------------------------------------------------------------
 // 壳启动时动态加载 config/services.yaml 中的服务声明。
+// 优先读取 exe 旁的 config/services.yaml（用户可编辑/新增服务），
+// 由后端 get_services_config 提供内容；读不到时回退内置 FALLBACK。
 // 为不引入额外 yaml 依赖，这里使用一个最小化的 YAML 解析器，仅覆盖
 // README 中定义的字段结构（见 config/services.yaml 注释）。
+import { invoke } from '@tauri-apps/api/core'
 
 export interface ServiceConfig {
   id: string
@@ -71,16 +74,15 @@ export function parseServicesYaml(text: string): ServicesFile {
 /**
  * 加载服务声明。
  *
- * 注意：绿色版（bundle.active=false）不打包 config/services.yaml，
- * 运行时 fetch 可能返回 Tauri 404 页或空内容，导致服务列表为空。
- * 因此以内置 FALLBACK 为唯一可靠来源：即使 fetch 成功但解析为空，
- * 也回退到 FALLBACK，保证至少存在 deepseek_harness 服务。
+ * 优先通过后端 get_services_config 读取 exe 旁的 config/services.yaml
+ * （用户可自由编辑/新增服务）；读取失败或解析为空时回退内置 FALLBACK，
+ * 保证至少存在 deepseek_harness 服务。
  */
 export async function loadServices(): Promise<ServicesFile> {
   try {
-    const res = await fetch('config/services.yaml')
-    if (res.ok) {
-      const parsed = parseServicesYaml(await res.text())
+    const text = await invoke<string>('get_services_config')
+    if (text) {
+      const parsed = parseServicesYaml(text)
       if (Object.keys(parsed.services).length > 0) {
         return parsed
       }

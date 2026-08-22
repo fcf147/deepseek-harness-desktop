@@ -25,9 +25,11 @@ pub fn run() {
             commands::stop_service,
             commands::health_check,
             commands::proxy_request,
+            commands::get_services_config,
         ])
         .setup(|_app| {
-            // 当前为免安装绿色版，未启用托盘图标；如需托盘，在 tauri.conf.json 配置 trayIcon 后再补充。
+            // 首次运行：确保 exe 旁生成可编辑的 config/services.yaml 与 scripts/bootstrap-dsh.sh
+            commands::ensure_runtime_files();
             Ok(())
         })
         .run(tauri::generate_context!())

@@ -42,6 +42,46 @@ pub fn install_wsl() -> wsl::InstallResult {
 // include_str! 保证：脚本内容随二进制一起分发，绿色版 exe 拷走即用，无需远程拉取。
 const BOOTSTRAP_SCRIPT: &str = include_str!("../../scripts/bootstrap-dsh.sh");
 
+// 编译期内嵌的默认服务配置（项目根 config/services.yaml）。
+// 首次运行时会被写出到 exe 旁的 config/services.yaml，供用户自由修改/新增服务。
+const DEFAULT_SERVICES_YAML: &str = include_str!("../../config/services.yaml");
+
+/// 返回 exe 所在目录（外部可编辑的 config/、scripts/ 都放这里）。
+fn exe_dir() -> Option<std::path::PathBuf> {
+    std::env::current_exe().ok()?.parent().map(|p| p.to_path_buf())
+}
+
+/// 确保 exe 旁存在可编辑的 config/ 与 scripts/ 目录及默认文件。
+/// 文件不存在则写入内置默认内容；已存在则保留用户修改，不做覆盖。
+pub fn ensure_runtime_files() {
+    let Some(dir) = exe_dir() else { return };
+    // config/services.yaml
+    let config_dir = dir.join("config");
+    if std::fs::create_dir_all(&config_dir).is_ok() {
+        let config_path = config_dir.join("services.yaml");
+        if !config_path.exists() {
+            let _ = std::fs::write(&config_path, DEFAULT_SERVICES_YAML);
+        }
+    }
+    // scripts/bootstrap-dsh.sh
+    let scripts_dir = dir.join("scripts");
+    if std::fs::create_dir_all(&scripts_dir).is_ok() {
+        let script_path = scripts_dir.join("bootstrap-dsh.sh");
+        if !script_path.exists() {
+            let _ = std::fs::write(&script_path, BOOTSTRAP_SCRIPT);
+        }
+    }
+}
+
+/// 读取 exe 旁的外部 bootstrap 脚本；若不存在则回退内置默认。
+fn load_bootstrap_script() -> String {
+    let Some(dir) = exe_dir() else {
+        return BOOTSTRAP_SCRIPT.to_string();
+    };
+    let path = dir.join("scripts").join("bootstrap-dsh.sh");
+    std::fs::read_to_string(&path).unwrap_or_else(|_| BOOTSTRAP_SCRIPT.to_string())
+}
+
 /// 安装日志事件负载：stream 为 "info" | "out" | "error"，text 为日志文本。
 #[derive(Clone, Serialize)]
 pub struct InstallLog {
@@ -62,6 +102,18 @@ pub fn check_service_installed(id: String, distro: Option<String>) -> bool {
         Some(d) => wsl::is_dsh_installed(&d),
         None => false,
     }
+}
+
+/// 读取 exe 旁 config/services.yaml 的内容。
+/// 供前端 loadServices 使用：外部文件存在则用它（用户可新增服务），
+/// 不存在则返回内置默认内容。
+#[tauri::command]
+pub fn get_services_config() -> String {
+    let Some(dir) = exe_dir() else {
+        return DEFAULT_SERVICES_YAML.to_string();
+    };
+    let path = dir.join("config").join("services.yaml");
+    std::fs::read_to_string(&path).unwrap_or_else(|_| DEFAULT_SERVICES_YAML.to_string())
 }
 
 /// 打开服务 UI：创建一个独立 WebviewWindow 加载目标 URL。
@@ -96,10 +148,12 @@ pub async fn install_service(
         return Err(state.hint.unwrap_or_else(|| "WSL 不可用".into()));
     }
     let distro = distro.or(state.default_distro).ok_or("无可用发行版")?;
-    // 第一步：DeepSeek Harness 走本地内嵌的 bootstrap 脚本。
+    // 第一步：DeepSeek Harness 走 bootstrap 脚本。
+    // 优先读取 exe 旁 scripts/bootstrap-dsh.sh（用户可编辑），否则用内置默认。
     // 通过 stdin 喂给 WSL 内的 bash 执行，逐行把输出 emit 到前端做流式日志。
+    let script = load_bootstrap_script();
     let app = app.clone();
-    let (code, _out, err) = wsl::exec_in_distro_stdin(&distro, BOOTSTRAP_SCRIPT, move |stream, line| {
+    let (code, _out, err) = wsl::exec_in_distro_stdin(&distro, &script, move |stream, line| {
         // 校验 UTF-8，避免 emit 失败导致安装中断
         let _ = app.emit(
             "install-log",
