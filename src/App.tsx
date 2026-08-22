@@ -198,6 +198,7 @@ export default function App() {
           <ServiceDetailBody
             service={selectedService}
             runtime={selectedRuntime}
+            collapsed={sidebarCollapsed}
             onInstall={() => handleInstall(selectedService.id)}
             onStart={() => handleStart(selectedService.id)}
             onStop={() => handleStop(selectedService.id)}
@@ -225,6 +226,7 @@ export default function App() {
 function ServiceDetailBody({
   service,
   runtime,
+  collapsed,
   onInstall,
   onStart,
   onStop,
@@ -232,12 +234,29 @@ function ServiceDetailBody({
 }: {
   service: ServiceConfig
   runtime: wslApi.ServiceRuntime | null
+  collapsed: boolean
   onInstall: () => void
   onStart: () => void
   onStop: () => void
   webview: React.ReactNode
 }) {
   const status = runtime?.status ?? 'unknown'
+  // 沉浸模式下折叠状态栏：仅保留一个最小化操作，避免用户无法停止服务
+  if (collapsed) {
+    return (
+      <div className="detail-and-webview">
+        <div className="detail-bar detail-bar-collapsed">
+          <span className="muted small">{service.label}</span>
+          <div className="detail-actions">
+            {status === 'not_installed' && <button className="btn small" onClick={onInstall}>安装</button>}
+            {(status === 'installed' || status === 'stopped') && <button className="btn small" onClick={onStart}>启动</button>}
+            {status === 'running' && <button className="btn small danger" onClick={onStop}>停止</button>}
+          </div>
+        </div>
+        {webview}
+      </div>
+    )
+  }
   return (
     <div className="detail-and-webview">
       <div className="detail-bar">
