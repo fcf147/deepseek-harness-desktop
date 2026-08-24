@@ -144,6 +144,16 @@ pub fn is_dsh_installed(distro: &str) -> bool {
     out.trim() == "1"
 }
 
+/// 检测指定发行版内 Open WebUI 是否已安装（检查 venv 内可执行）。
+pub fn is_open_webui_installed(distro: &str) -> bool {
+    let probe = "test -x \"$HOME/.venv/open-webui/bin/open-webui\" && echo 1 || echo 0";
+    let (code, out, _err) = exec_in_distro(distro, probe);
+    if code != 0 {
+        return false;
+    }
+    out.trim() == "1"
+}
+
 /// 检测 WSL 整体状态。
 pub fn detect() -> WslState {
     let platform = if is_windows() { "win32" } else { "other" };

@@ -106,6 +106,17 @@ const FALLBACK: Record<string, ServiceConfig> = {
     autostart: { cmd: 'dsh web --port 3080 --no-open' },
     depends_on: ['wsl'],
   },
+  open_webui: {
+    id: 'open_webui',
+    label: 'Open WebUI',
+    mode: 'webview_embed',
+    base_url: 'http://127.0.0.1:8080',
+    ui_path: '/',
+    health: 'http://127.0.0.1:8080/health',
+    install: { type: 'wsl_script', script_url: 'scripts/bootstrap-openwebui.sh' },
+    autostart: { cmd: "bash -lc '$HOME/.venv/open-webui/bin/open-webui serve --host 0.0.0.0 --port 8080'" },
+    depends_on: ['wsl'],
+  },
 }
 
 export function serviceList(file: ServicesFile): ServiceConfig[] {
